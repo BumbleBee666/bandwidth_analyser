@@ -15,11 +15,12 @@
 #define BANDWIDTHMONTH_H
 
 #include <string>
-#include <vector>
+#include <set>
 #include <map>
 
 #include "BandwidthDataPoint.h"
 #include "BandwidthDay.h"
+#include "BandwidthStatistics.h"
 
 class BandwidthMonth {
 public:
@@ -27,16 +28,21 @@ public:
     BandwidthMonth(const BandwidthMonth& orig);
     virtual ~BandwidthMonth();
     
-    bool LoadData(const std::string& date);
+    bool LoadData(const std::string& filepath, const std::string& date);
 
-    const std::map<int, double>& Data() { return m_bandwidthData; }
+    const std::map<std::string, BandwidthStatistics*>& Statistics() const { return m_stats; }
     
-    const std::string& Date() { return m_date; }
+    const std::string& Month() const { return m_month; }
+    const std::map<std::string, BandwidthDay*>& Days() const { return m_days; }
+    static void GetFileMonths(const std::string& filepath, std::set<std::string>& filemonths);
     
 private:
-    std::string m_date;
-    std::map<int, double> m_bandwidthData;
-    std::map<int, BandwidthDay*> m_days;
+    void GetFileDates(const std::string& filepath, const std::string& month, std::set<std::string>& filedates) const;
+
+    std::string m_month;
+    std::map<std::string, BandwidthStatistics*> m_stats;
+    std::map<std::string, BandwidthDay*> m_days;
+    static const std::string m_directory;
 };
 
 #endif /* BANDWIDTHMONTH_H */

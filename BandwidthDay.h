@@ -27,13 +27,13 @@ public:
     
     bool LoadData(const std::string& date);
 
-    const std::map<int, BandwidthDataPoint*>& Data() { return m_bandwidthData; }
+    const std::map<std::string, BandwidthDataPoint*>& DataPoints() { return m_bandwidthData; }
     
     const std::string& Date() { return m_date; }
     
 private:
     std::string m_date;
-    std::map<int, BandwidthDataPoint*> m_bandwidthData;
+    std::map<std::string, BandwidthDataPoint*> m_bandwidthData;
 };
 
 #endif /* BANDWIDTHDAY_H */

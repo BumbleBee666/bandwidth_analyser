@@ -9,10 +9,12 @@ incdir = include_directories('/usr/include/c++/10/','/usr/include/aarch64-linux-
 sources = [
 'bandwidth_analyser.cpp',
 'MyGTKWindow.cpp',
+'MyGTKCalendarWindow.cpp',
 'BandwidthFile.cpp',
 'BandwidthDay.cpp',
 'BandwidthMonth.cpp',
-'BandwidthDataPoint.cpp'
+'BandwidthDataPoint.cpp',
+'BandwidthStatistics.cpp'
 ]
 
 exe = executable('bandwidth_analyser', sources,

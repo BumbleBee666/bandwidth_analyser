@@ -54,7 +54,7 @@ bool BandwidthDay::LoadData(const std::string& date)
                     if (datapoint != NULL)
                     {
                         std::string filetime = datapoint->Time().substr(0,2) + datapoint->Time().substr(3,2);
-                        m_bandwidthData.insert(std::pair<int, BandwidthDataPoint*>(std::atoi(filetime.c_str()), datapoint));
+                        m_bandwidthData.insert(std::pair<std::string, BandwidthDataPoint*>(filetime.c_str(), datapoint));
                     }
                 }
             }            

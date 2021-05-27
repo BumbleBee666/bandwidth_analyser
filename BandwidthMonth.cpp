@@ -14,11 +14,14 @@
 #include <set>
 #include <filesystem>
 #include <dirent.h>
+#include <vector>
 
 #include "BandwidthMonth.h"
 #include "BandwidthDataPoint.h"
 #include "BandwidthDay.h"
 
+//const std::string BandwidthMonth::m_directory = "//home//mark//Documents//bandwidth";
+    
 BandwidthMonth::BandwidthMonth() {
 }
 
@@ -28,18 +31,13 @@ BandwidthMonth::BandwidthMonth(const BandwidthMonth& orig) {
 BandwidthMonth::~BandwidthMonth() {
 }
 
-bool BandwidthMonth::LoadData(const std::string& date)
+void BandwidthMonth::GetFileDates(const std::string& filepath, const std::string& month, std::set<std::string>& filedates) const
 {
-    bool bSuccess = false;
-    m_date = date;
-    
-    const std::string directory = "//home//mark//Documents//bandwidth";
-    
-    std::set<std::string> filedates;
+    filedates.clear();
     
     DIR *dir;
     struct dirent *ent;
-    if ((dir = opendir (directory.c_str())) != NULL)
+    if ((dir = opendir (filepath.c_str())) != NULL)
     {
         while ((ent = readdir (dir)) != NULL) 
         {
@@ -49,7 +47,7 @@ bool BandwidthMonth::LoadData(const std::string& date)
             if (pos >= 0)
             {
                 const std::string filedate = filename.substr(pos+8, 8);
-                if (filedate.substr(0, 6).compare(date) == 0)
+                if (filedate.substr(0, 6).compare(month) == 0)
                 {
                     filedates.insert(filedate);
                 }
@@ -57,40 +55,78 @@ bool BandwidthMonth::LoadData(const std::string& date)
         }
         closedir (dir);
     }
+}
+
+void BandwidthMonth::GetFileMonths(const std::string& filepath, std::set<std::string>& filemonths)
+{
+    filemonths.clear();
     
-    for (std::set<std::string>::iterator it = filedates.begin(); it != filedates.end(); ++it)
+    DIR *dir;
+    struct dirent *ent;
+    if ((dir = opendir (filepath.c_str())) != NULL)
+    {
+        while ((ent = readdir (dir)) != NULL) 
+        {
+            const std::string filename(ent->d_name);
+            int pos = filename.find("results_", 0);
+            
+            if (pos >= 0)
+            {
+                const std::string filedate = filename.substr(pos+8, 8);
+                filemonths.insert(filename.substr(pos+8, 6));
+            }            
+        }
+        closedir (dir);
+    }
+}
+
+bool BandwidthMonth::LoadData(const std::string& filepath, const std::string& month)
+{
+    bool bSuccess = false;
+    
+    m_month = month;
+    
+    // Get the file dates for the specified month.
+    std::set<std::string> filedates;
+    GetFileDates(filepath, m_month, filedates);
+    
+    for (std::set<std::string>::const_iterator it = filedates.begin(); it != filedates.end(); ++it)
     {
         BandwidthDay* day = new BandwidthDay();
         day->LoadData(*it);
-        m_days.insert(std::pair<int, BandwidthDay*>(std::atoi((*it).c_str()), day));
+        m_days[*it] = day;
     }
     
     // Build our daily averages.
-    std::map<int, std::vector<double>> averages;
+    std::map<std::string, std::vector<double>> averages;
     
-    for (std::map<int, BandwidthDay*>::iterator it = m_days.begin() ; it != m_days.end() ; ++it)
+    for (std::map<std::string, BandwidthDay*>::const_iterator it_day = m_days.begin() ; it_day != m_days.end() ; ++it_day)
     {
-        for (std::map<int, BandwidthDataPoint*>::const_iterator it_dps = (*it).second->Data().begin() ; it_dps != (*it).second->Data().end() ; ++it_dps)
+        for (std::map<std::string, BandwidthDataPoint*>::const_iterator it_dp = it_day->second->DataPoints().begin() ; it_dp != it_day->second->DataPoints().end() ; ++it_dp)
         {
-            std::map<int, std::vector<double>>::iterator it_time = averages.find((*it_dps).first);
+            std::map<std::string, std::vector<double>>::const_iterator it_time = averages.find(it_dp->first);
             if (it_time == averages.end())
             {
-                averages[(*it_dps).first] = std::vector<double>();
+                averages[it_dp->first] = std::vector<double>();
             }
-            averages[(*it_dps).first].push_back((*it_dps).second->Bandwidth());
+            averages[it_dp->first].push_back(it_dp->second->Bandwidth());
         }
     }
     
-    for (std::map<int, std::vector<double>>::iterator it = averages.begin() ; it != averages.end() ; ++it)
+    for (std::map<std::string, std::vector<double>>::const_iterator it_average = averages.begin() ; it_average != averages.end() ; ++it_average)
     {
-        double result = 0.0;
-        for (std::vector<double>::iterator it_vec = (*it).second.begin() ; it_vec != (*it).second.end() ; ++it_vec)
+        double high = 0.0;
+        double low = 80.0;
+        double average = 0.0;
+        for (std::vector<double>::const_iterator it_vec = it_average->second.begin() ; it_vec != it_average->second.end() ; ++it_vec)
         {
-            result += *it_vec;
+            if (*it_vec > high) high = *it_vec;
+            if (*it_vec < low) low = *it_vec;
+            average += *it_vec;
         }
-        result = result / (*it).second.size();
+        average = average / it_average->second.size();
         
-        m_bandwidthData[(*it).first] = result;
+        m_stats[it_average->first] = new BandwidthStatistics(it_average->first, average, high, low);
     }
     
     return bSuccess;
