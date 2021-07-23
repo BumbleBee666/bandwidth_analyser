@@ -28,32 +28,36 @@ BandwidthFile::BandwidthFile(const BandwidthFile& orig) {
 BandwidthFile::~BandwidthFile() {
 }
 
-void BandwidthFile::GetFields(const std::string& inLine, std::vector <std::string>& fields)
+std::unique_ptr<std::vector<std::string>> BandwidthFile::GetFields(const std::string& inLine)
 {
+    auto fields = std::unique_ptr<std::vector<std::string>>(new std::vector<std::string>());
+    
     bool bInField = false;
     std::string strField;
-    for (auto it=inLine.begin();it!=inLine.end();++it)
+    for (auto const& it : inLine)
     {
-        if (*it == '"')
+        if (it == '"')
         {
             bInField = !bInField;
         }
-        else if (*it == ',' && !bInField)
+        else if (it == ',' && !bInField)
         {
-            fields.push_back(strField);
+            fields->push_back(strField);
             strField = "";
         }
         else
         {
-            strField += *it;
+            strField += it;
         }
     }
-    fields.push_back(strField);
+    fields->push_back(strField);
+    
+    return fields;
 }
 
-BandwidthDataPoint* BandwidthFile::LoadFile (const std::string& filename)
+std::unique_ptr<BandwidthDataPoint> BandwidthFile::LoadFile (const std::string& filename)
 {
-    BandwidthDataPoint* datapoint = NULL;
+    auto datapoint = std::unique_ptr<BandwidthDataPoint>();
     
     try
     {
@@ -63,22 +67,19 @@ BandwidthDataPoint* BandwidthFile::LoadFile (const std::string& filename)
         getline (inFile, inLine);
         if (inLine.length() > 0)
         {
-            std::vector <std::string> fields;
-            GetFields(inLine, fields);
-            double bandwidth = std::stod(fields[5]) / 125000.0;
+            auto fields = GetFields(inLine);
+            double bandwidth = std::stod((*fields)[5]) / 125000.0;
             
             int pos = filename.find("results_", 0);
             std::string filedate = filename.substr(pos+8, 8);
             std::string filetime = filename.substr(pos+17, 5);
             
-            datapoint = new BandwidthDataPoint(filedate, filetime, bandwidth);
+            datapoint = std::unique_ptr<BandwidthDataPoint>(new BandwidthDataPoint(filedate, filetime, bandwidth));
         }
         inFile.close();
     }
     catch (...)
     {
-        if (datapoint) delete datapoint;
-        datapoint = NULL;
     }
     
     return datapoint;

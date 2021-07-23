@@ -22,7 +22,7 @@ MyGTKCalendarWindow::MyGTKCalendarWindow(GtkApplication* app)
     gtk_window_set_title(GTK_WINDOW (window), "Select Day");
     gtk_window_set_resizable (GTK_WINDOW (window), FALSE);
     
-    box = gtk_vbox_new (FALSE, DEF_PAD);
+    box = gtk_box_new (GTK_ORIENTATION_VERTICAL, DEF_PAD);
     gtk_container_add (GTK_CONTAINER (window), box);
     
     frame = gtk_frame_new ("Calendar");

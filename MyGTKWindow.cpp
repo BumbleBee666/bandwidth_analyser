@@ -19,35 +19,42 @@
 #include <gtk-2.0/gtk/gtkwidget.h>
 #include <gtk-2.0/gtk/gtkdrawingarea.h>
 #include <deque>
+#include <set>
+#include <algorithm>
 
 #include "MyGTKCalendarWindow.h"
+#include "BandwidthData.h"
 #include "BandwidthDay.h"
+#include "BandwidthStatistics.h"
 
 #include "MyGTKWindow.h"
 
 int MyGTKWindow::width = 1460;
 int MyGTKWindow::height = 700;
 
-MyGTKWindow::MyGTKWindow(GtkApplication* app, const std::string filepath) :
+MyGTKWindow::MyGTKWindow(GtkApplication* app, std::shared_ptr<const BandwidthData> bandwidthData) :
 app(app),
 calendar(NULL),
 surface(NULL),
-selected_day("")
+selected_day(""),
+m_bandwidthData(bandwidthData),
+window(NULL),
+box1(NULL)
 {
-    std::set<std::string> months;
-    BandwidthMonth::GetFileMonths(filepath, months);
-    
-    for (std::set<std::string>::const_iterator it = months.begin() ; it != months.end() ; ++it)
-    {
-        BandwidthMonth *bandwidthMonth = new BandwidthMonth();
-        bandwidthMonth->LoadData(filepath, *it);
-        m_bandwidthMonths.push_back(bandwidthMonth);
-    }
-    
     window = gtk_application_window_new (app);
-    
+
     gtk_window_set_title(GTK_WINDOW (window), "Welcome to GNOME");
     gtk_window_set_default_size(GTK_WINDOW (window), width, height);
+    
+    DrawWindow();
+}
+
+void MyGTKWindow::DrawWindow()
+{
+    if (box1 != NULL)
+    {
+        gtk_widget_destroy(box1);
+    }
     
     box1 = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     gtk_container_add (GTK_CONTAINER (window), box1);
@@ -61,16 +68,16 @@ selected_day("")
     GtkWidget *subMenu = gtk_menu_new ();
     gtk_menu_item_set_submenu( GTK_MENU_ITEM( item ), subMenu );
 
-    GtkWidget *byMonth_item = gtk_menu_item_new_with_label( "By Month" );
+    byMonth_item = gtk_menu_item_new_with_label( "By Month" );
     gtk_menu_shell_append( GTK_MENU_SHELL(subMenu), byMonth_item );
-//    g_signal_connect (open_item, "select", G_CALLBACK (LoadDataFile), this);
     
-    GtkWidget *byMonth_subMenu = gtk_menu_new ();
+    byMonth_subMenu = gtk_menu_new ();
     gtk_menu_item_set_submenu( GTK_MENU_ITEM( byMonth_item ), byMonth_subMenu );
     
-    for (std::set<std::string>::const_iterator it = months.begin() ; it != months.end() ; ++it)
+    m_months = m_bandwidthData->GetMonths();
+    for (auto const& it : *m_months)
     {
-        GtkWidget *month_item = gtk_check_menu_item_new_with_label((*it).c_str());
+        GtkWidget *month_item = gtk_check_menu_item_new_with_label(it.c_str());
         gtk_check_menu_item_set_active((GtkCheckMenuItem*)month_item, true);
         g_signal_connect (month_item, "toggled", G_CALLBACK (Toggled), this);
         gtk_menu_shell_append( GTK_MENU_SHELL(byMonth_subMenu), month_item );
@@ -102,8 +109,71 @@ selected_day("")
     /* Signals used to handle the backing surface */
     g_signal_connect (drawing_area,"configure-event", G_CALLBACK (Configure), this);
     g_signal_connect (drawing_area, "draw", G_CALLBACK (Draw), this);
+
+    int max = m_bandwidthData->GetNoOfDays() == 0 ? 1 : m_bandwidthData->GetNoOfDays();
+    slider = gtk_scale_new_with_range (GTK_ORIENTATION_HORIZONTAL, 0, max, 1.0);
+    gtk_container_add (GTK_CONTAINER (box1), slider);
+    g_signal_connect (slider, "format-value", G_CALLBACK (FormatValue), this);
+    g_signal_connect (slider, "value-changed", G_CALLBACK (ValueChanged), this);
     
     gtk_widget_show_all(window);
+}
+
+void MyGTKWindow::ValueChanged (GtkRange *range, gpointer data)
+{
+    MyGTKWindow* myWindow = (MyGTKWindow*)data;
+    
+    int i = 0;
+    int iVal = gtk_range_get_value(range);
+    int iStartVal = iVal - 10;
+    if (iStartVal < 0) iStartVal = 0;
+    int iEndVal = iVal + 10;
+    if (iEndVal >= myWindow->m_bandwidthData->GetNoOfDays()) iEndVal = myWindow->m_bandwidthData->GetNoOfDays() - 1;
+    for (auto const& it_day : myWindow->m_bandwidthData->GetDays())
+    {
+        if (i==iStartVal)
+        {
+            myWindow->start_day = it_day.second->Date();
+        }
+        if (i==iEndVal)
+        {
+            myWindow->end_day = it_day.second->Date();
+        }
+        i++;
+    }
+
+    myWindow->selected_day = "";
+    
+    DrawSurface(myWindow);
+    
+    gtk_widget_queue_draw(myWindow->drawing_area);
+}
+
+void MyGTKWindow::BandwidthUpdated()
+{
+    DrawWindow();
+
+    DrawSurface(this);
+    
+    gtk_widget_queue_draw(drawing_area);
+}
+
+gchar* MyGTKWindow::FormatValue(GtkScale *scale, gdouble value, gpointer data)
+{
+    MyGTKWindow* myWindow = (MyGTKWindow*)data;
+    
+    int iVal = value;
+    
+    int i = 0;
+    int iDate = 0;
+    for (auto const& it_day : myWindow->m_bandwidthData->GetDays())
+    {
+        if (i==iVal)
+            iDate = atoi(it_day.second->Date().c_str());
+        i++;
+    }
+    
+    return g_strdup_printf ("%d", iDate);
 }
 
 MyGTKWindow::MyGTKWindow(const MyGTKWindow& orig)
@@ -119,6 +189,11 @@ void MyGTKWindow::Toggled (GtkCheckMenuItem *menuitem, gpointer data)
     MyGTKWindow* myWindow = (MyGTKWindow*)data;
     
     myWindow->selected_day = "";
+    myWindow->start_day = "";
+
+    DrawSurface(myWindow);
+    
+    gtk_widget_queue_draw(myWindow->drawing_area);
 }
 
 void MyGTKWindow::SelectDay (GtkMenuItem *menuitem, gpointer data)
@@ -160,7 +235,7 @@ void MyGTKWindow::DayDoubleClicked (GtkCalendar *calendar, gpointer data)
     sprintf(buffer, "%04d%02d%02d", year, month+1, day);
     myWindow->selected_day = buffer;
     
-    gtk_dialog_response(GTK_DIALOG(myWindow->dialog), NULL);
+    gtk_dialog_response(GTK_DIALOG(myWindow->dialog), 0);
 }
 
 void MyGTKWindow::DrawSurface (MyGTKWindow* myWindow)
@@ -178,8 +253,8 @@ void MyGTKWindow::DrawSurface (MyGTKWindow* myWindow)
     
     int time_shift = 10;
     int time_scale = 5;
-    
-    int bandwidth_shift = 650;
+
+    int bandwidth_shift = gtk_widget_get_allocated_height(myWindow->drawing_area) - 50;
     int bandwidth_scale = 8;
     
     int sample_rate_in_minutes = 5;
@@ -187,113 +262,65 @@ void MyGTKWindow::DrawSurface (MyGTKWindow* myWindow)
     if (!myWindow->selected_day.empty())
     {
         // We need to show the chart for a specific day.
-        // Look to see if we have the appropriate month record.
-        for (std::vector<BandwidthMonth*>::const_iterator month_it = myWindow->m_bandwidthMonths.begin() ; month_it != myWindow->m_bandwidthMonths.end() ; ++month_it)
+        try
         {
-            const std::string& strMonth = (*month_it)->Month();
-            if (strMonth.substr(0,6).compare(myWindow->selected_day.substr(0,6)) == 0)
+            auto const& day = myWindow->m_bandwidthData->GetDay(myWindow->selected_day);
+            cairo_set_source_rgb (cr, 0, 0, 0);
+            int x = 0;
+            for (auto const& datapoint : day.DataPoints())
             {
-                // We found the month.
-                std::map<std::string, BandwidthDay*>::const_iterator day_it = (*month_it)->Days().find(myWindow->selected_day);
-                if (day_it != (*month_it)->Days().end())
+                int bandwidth = bandwidth_shift - datapoint.second->Bandwidth() * bandwidth_scale;
+                if (x == 0)
                 {
-                    cairo_set_source_rgb (cr, 0, 0, 0);
-                    int x = 0;
-                    for (std::map<std::string, BandwidthDataPoint*>::const_iterator it_dp = day_it->second->DataPoints().begin() ; it_dp != day_it->second->DataPoints().end() ; ++it_dp)
-                    {
-                        int bandwidth = bandwidth_shift - it_dp->second->Bandwidth() * bandwidth_scale;
-                        if (x == 0)
-                        {
-                            x = time_shift;
-                            cairo_move_to (cr, x, bandwidth);
-                        }
-                        else
-                        {
-                            int hour = atoi(it_dp->first.substr(0,2).c_str());
-                            int minute = atoi(it_dp->first.substr(2,2).c_str());
-                            int elapsed_minutes = hour * 60 + minute;
-                            x = time_shift + elapsed_minutes / sample_rate_in_minutes * time_scale;
-                            cairo_line_to (cr, x, bandwidth);
-                        }
-                    }
-                    cairo_stroke (cr);
+                    x = time_shift;
+                    cairo_move_to (cr, x, bandwidth);
+                }
+                else
+                {
+                    int hour = atoi(datapoint.first.substr(0,2).c_str());
+                    int minute = atoi(datapoint.first.substr(2,2).c_str());
+                    int elapsed_minutes = hour * 60 + minute;
+                    x = time_shift + elapsed_minutes / sample_rate_in_minutes * time_scale;
+                    cairo_line_to (cr, x, bandwidth);
+                }
+            }
+            cairo_stroke (cr);
+        }
+        catch (std::invalid_argument)
+        {}
+    }
+    else if (!myWindow->start_day.empty())
+    {
+        auto months = myWindow->m_bandwidthData->GetMonths();
+        for(auto const& month_it : *months)
+        {
+            // Should we draw this month?
+            for (std::vector<GtkCheckMenuItem*>::const_iterator menu_it = myWindow->m_menuItems.begin() ; menu_it != myWindow->m_menuItems.end() ; ++menu_it)
+            {
+                if (month_it.compare(gtk_menu_item_get_label((GtkMenuItem*)*menu_it)) == 0 && gtk_check_menu_item_get_active((GtkCheckMenuItem*)*menu_it))
+                {
+                    // Yes, so we need to retrieve the statistics for this month.
+                    auto statistics = myWindow->m_bandwidthData->GetStatistics(myWindow->start_day, myWindow->end_day);
+                    
+                    DrawStatisticalView(cr, *statistics, bandwidth_shift, bandwidth_scale, time_shift, time_scale, sample_rate_in_minutes);
                 }
             }
         }
     }
     else
     {
-        for (std::vector<BandwidthMonth*>::const_iterator month_it = myWindow->m_bandwidthMonths.begin() ; month_it != myWindow->m_bandwidthMonths.end() ; ++month_it)
+        auto months = myWindow->m_bandwidthData->GetMonths();
+        for(auto const& month_it : *months)
         {
-            std::string strMonth = (*month_it)->Month();
-
             // Should we draw this month?
             for (std::vector<GtkCheckMenuItem*>::const_iterator menu_it = myWindow->m_menuItems.begin() ; menu_it != myWindow->m_menuItems.end() ; ++menu_it)
             {
-                if (strMonth.compare(gtk_menu_item_get_label((GtkMenuItem*)*menu_it)) == 0 && gtk_check_menu_item_get_active((GtkCheckMenuItem*)*menu_it))
+                if (month_it.compare(gtk_menu_item_get_label((GtkMenuItem*)*menu_it)) == 0 && gtk_check_menu_item_get_active((GtkCheckMenuItem*)*menu_it))
                 {
-                    cairo_set_source_rgba (cr, 1, 0, 0, 0.5);
-                    int x = 0;
-                    std::deque<int> high_av;
-                    std::deque<int> low_av;
-                    int count = 0;
-                    for (std::map<std::string, BandwidthStatistics*>::const_iterator it_stat = (*month_it)->Statistics().begin() ; it_stat != (*month_it)->Statistics().end() ; ++it_stat)
-                    {
-                        int bandwidth_high = bandwidth_shift - it_stat->second->High() * bandwidth_scale;
-                        int bandwidth_low = bandwidth_shift - it_stat->second->Low() * bandwidth_scale;
-
-                        if (count < 5)
-                        {
-                            count++;
-                        }
-                        else
-                        {
-                            high_av.pop_front();
-                            low_av.pop_front();
-                        }
-
-                        high_av.push_back(bandwidth_high);
-                        low_av.push_back(bandwidth_low);
-
-                        bandwidth_high = 0;
-                        for (std::deque<int>::const_iterator it_high = high_av.begin() ; it_high != high_av.end() ; ++it_high)
-                            bandwidth_high += *it_high;
-                        bandwidth_high = bandwidth_high / count;
-
-                        bandwidth_low = 0;
-                        for (std::deque<int>::const_iterator it_low = low_av.begin() ; it_low != low_av.end() ; ++it_low)
-                            bandwidth_low += *it_low;
-                        bandwidth_low = bandwidth_low / count;
-
-                        int hour = atoi(it_stat->first.substr(0,2).c_str());
-                        int minute = atoi(it_stat->first.substr(2,2).c_str());
-                        int elapsed_minutes = hour * 60 + minute;
-                        x = time_shift + elapsed_minutes / sample_rate_in_minutes * time_scale;
-                        cairo_move_to (cr, x, bandwidth_high);
-                        cairo_line_to (cr, x, bandwidth_low);
-                        cairo_stroke (cr);
-                    }
-
-                    cairo_set_source_rgb (cr, 0, 0, 0);
-                    x = 0;
-                    for (std::map<std::string, BandwidthStatistics*>::const_iterator it_stat = (*month_it)->Statistics().begin() ; it_stat != (*month_it)->Statistics().end() ; ++it_stat)
-                    {
-                        int bandwidth = bandwidth_shift - it_stat->second->Average() * bandwidth_scale;
-                        if (x == 0)
-                        {
-                            x = time_shift;
-                            cairo_move_to (cr, x, bandwidth);
-                        }
-                        else
-                        {
-                            int hour = atoi(it_stat->first.substr(0,2).c_str());
-                            int minute = atoi(it_stat->first.substr(2,2).c_str());
-                            int elapsed_minutes = hour * 60 + minute;
-                            x = time_shift + elapsed_minutes / sample_rate_in_minutes * time_scale;
-                            cairo_line_to (cr, x, bandwidth);
-                        }
-                    }
-                    cairo_stroke (cr);
+                    // Yes, so we need to retrieve the statistics for this month.
+                    auto statistics = myWindow->m_bandwidthData->GetStatistics(month_it);
+                    
+                    DrawStatisticalView(cr, *statistics, bandwidth_shift, bandwidth_scale, time_shift, time_scale, sample_rate_in_minutes);
                 }
             }
         }
@@ -332,6 +359,72 @@ void MyGTKWindow::DrawSurface (MyGTKWindow* myWindow)
     }
     
     cairo_destroy (cr);
+}
+
+void MyGTKWindow::DrawStatisticalView(cairo_t *cr, const std::map<std::string, std::unique_ptr<BandwidthStatistics>>& statistics, int bandwidth_shift, int bandwidth_scale, int time_shift, int time_scale, int sample_rate_in_minutes)
+{
+    cairo_set_source_rgba (cr, 1, 0, 0, 0.5);
+    int x = 0;
+    std::deque<int> high_av;
+    std::deque<int> low_av;
+    int count = 0;
+    for (auto const& it_stat : statistics)
+    {
+        int bandwidth_high = bandwidth_shift - it_stat.second.get()->High() * bandwidth_scale;
+        int bandwidth_low = bandwidth_shift - it_stat.second.get()->Low() * bandwidth_scale;
+
+        if (count < 5)
+        {
+            count++;
+        }
+        else
+        {
+            high_av.pop_front();
+            low_av.pop_front();
+        }
+
+        high_av.push_back(bandwidth_high);
+        low_av.push_back(bandwidth_low);
+
+        bandwidth_high = 0;
+        for (std::deque<int>::const_iterator it_high = high_av.begin() ; it_high != high_av.end() ; ++it_high)
+            bandwidth_high += *it_high;
+        bandwidth_high = bandwidth_high / count;
+
+        bandwidth_low = 0;
+        for (std::deque<int>::const_iterator it_low = low_av.begin() ; it_low != low_av.end() ; ++it_low)
+            bandwidth_low += *it_low;
+        bandwidth_low = bandwidth_low / count;
+
+        int hour = atoi(it_stat.first.substr(0,2).c_str());
+        int minute = atoi(it_stat.first.substr(2,2).c_str());
+        int elapsed_minutes = hour * 60 + minute;
+        x = time_shift + elapsed_minutes / sample_rate_in_minutes * time_scale;
+        cairo_move_to (cr, x, bandwidth_high);
+        cairo_line_to (cr, x, bandwidth_low);
+        cairo_stroke (cr);
+    }
+
+    cairo_set_source_rgb (cr, 0, 0, 0);
+    x = 0;
+    for (auto const& it_stat : statistics)
+    {
+        int bandwidth = bandwidth_shift - it_stat.second.get()->Average() * bandwidth_scale;
+        if (x == 0)
+        {
+            x = time_shift;
+            cairo_move_to (cr, x, bandwidth);
+        }
+        else
+        {
+            int hour = atoi(it_stat.first.substr(0,2).c_str());
+            int minute = atoi(it_stat.first.substr(2,2).c_str());
+            int elapsed_minutes = hour * 60 + minute;
+            x = time_shift + elapsed_minutes / sample_rate_in_minutes * time_scale;
+            cairo_line_to (cr, x, bandwidth);
+        }
+    }
+    cairo_stroke (cr);
 }
 
 gboolean MyGTKWindow::Configure (GtkWidget *widget, GdkEventConfigure *event, gpointer data)

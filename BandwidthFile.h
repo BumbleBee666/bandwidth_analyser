@@ -15,6 +15,7 @@
 #define BANDWIDTHFILE_H
 
 #include <vector>
+#include <memory>
 
 #include "BandwidthDataPoint.h"
 
@@ -24,10 +25,10 @@ public:
     BandwidthFile(const BandwidthFile& orig);
     virtual ~BandwidthFile();
     
-    static BandwidthDataPoint* LoadFile (const std::string& filename);
+    static std::unique_ptr<BandwidthDataPoint> LoadFile (const std::string& filename);
     
 private:
-    static void GetFields(const std::string& inLine, std::vector <std::string>& fields);
+    static std::unique_ptr<std::vector<std::string>> GetFields(const std::string& inLine);
 };
 
 #endif /* BANDWIDTHFILE_H */

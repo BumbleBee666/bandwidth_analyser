@@ -16,24 +16,26 @@
 
 #include <string>
 #include <map>
+#include <memory>
 
 #include "BandwidthDataPoint.h"
 
 class BandwidthDay {
 public:
-    BandwidthDay();
+    BandwidthDay(const std::string& date);
     BandwidthDay(const BandwidthDay& orig);
     virtual ~BandwidthDay();
     
-    bool LoadData(const std::string& date);
+    void LoadData(const std::string& directory);
+    void LoadDataPoint(const std::string& directory, const std::string& filename);
 
-    const std::map<std::string, BandwidthDataPoint*>& DataPoints() { return m_bandwidthData; }
+    const std::map<std::string, const std::unique_ptr<const BandwidthDataPoint>>& DataPoints() const;
     
-    const std::string& Date() { return m_date; }
+    const std::string& Date() const { return m_date; }
     
 private:
     std::string m_date;
-    std::map<std::string, BandwidthDataPoint*> m_bandwidthData;
+    std::map<std::string, std::unique_ptr<const BandwidthDataPoint>> m_bandwidthData;
 };
 
 #endif /* BANDWIDTHDAY_H */

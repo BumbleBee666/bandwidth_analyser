@@ -17,24 +17,41 @@
 #include "BandwidthDay.h"
 #include "BandwidthFile.h"
 
-BandwidthDay::BandwidthDay()
+BandwidthDay::BandwidthDay(const std::string& date)
+:m_date(date)
 {
 }
 
 BandwidthDay::BandwidthDay(const BandwidthDay& orig)
-{
+{   
+    this->m_date = orig.m_date;
+    for (auto const& it : orig.m_bandwidthData)
+    {
+        m_bandwidthData[it.first] = std::make_unique<BandwidthDataPoint>(*it.second);
+    }
 }
 
 BandwidthDay::~BandwidthDay() {
 }
 
-bool BandwidthDay::LoadData(const std::string& date)
+void BandwidthDay::LoadDataPoint(const std::string& directory, const std::string& filename)
 {
-    bool bSuccess = false;
-    m_date = date;
-    
-    const std::string directory = "//home//mark//Documents//bandwidth";
-    
+    auto datapoint = BandwidthFile::LoadFile(directory + "//" + filename);
+    if (datapoint != NULL)
+    {
+        std::string filetime = datapoint->Time().substr(0,2) + datapoint->Time().substr(3,2);
+        m_bandwidthData[filetime] = std::move(datapoint);
+    }
+}
+
+const std::map<std::string, const std::unique_ptr<const BandwidthDataPoint>>& BandwidthDay::DataPoints() const
+{ 
+    return (const std::map<std::string, const std::unique_ptr<const BandwidthDataPoint>>&)m_bandwidthData; 
+}
+   
+
+void BandwidthDay::LoadData(const std::string& directory)
+{
     DIR *dir;
     struct dirent *ent;
     if ((dir = opendir (directory.c_str())) != NULL)
@@ -48,19 +65,17 @@ bool BandwidthDay::LoadData(const std::string& date)
             if (pos >= 0)
             {
                 const std::string filedate = filename.substr(pos+8, 8);
-                if (filedate.compare(date) == 0)
+                if (filedate.compare(m_date) == 0)
                 {
-                    BandwidthDataPoint* datapoint = BandwidthFile::LoadFile(directory + "//" + filename);
+                    auto datapoint = BandwidthFile::LoadFile(directory + "//" + filename);
                     if (datapoint != NULL)
                     {
                         std::string filetime = datapoint->Time().substr(0,2) + datapoint->Time().substr(3,2);
-                        m_bandwidthData.insert(std::pair<std::string, BandwidthDataPoint*>(filetime.c_str(), datapoint));
+                        m_bandwidthData[filetime] = std::move(datapoint);
                     }
                 }
             }            
         }
         closedir (dir);
     }
-    
-    return bSuccess;
 }

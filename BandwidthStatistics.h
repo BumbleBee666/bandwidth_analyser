@@ -22,10 +22,10 @@ public:
     BandwidthStatistics(const BandwidthStatistics& orig);
     virtual ~BandwidthStatistics();
     
-    double Average() { return m_average; }
-    double High() { return m_high; }
-    double Low() { return m_low; }
-    const std::string& Time() { return m_time; }
+    double Average() const { return m_average; }
+    double High() const { return m_high; }
+    double Low() const { return m_low; }
+    const std::string& Time() const { return m_time; }
 
 private:
     double m_average;

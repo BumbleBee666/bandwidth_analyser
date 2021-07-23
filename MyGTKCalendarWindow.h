@@ -14,6 +14,8 @@
 #ifndef MYGTKCALENDARWINDOW_H
 #define MYGTKCALENDARWINDOW_H
 
+#include <memory>
+
 #include <gtk/gtk.h>
 
 class MyGTKCalendarWindow {

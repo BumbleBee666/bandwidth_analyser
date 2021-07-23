@@ -3,39 +3,44 @@
 #include <string>
 
 #include "MyGTKWindow.h"
+#include "BandwidthData.h"
 
 #define PROJECT_NAME "bandwidth_analyser"
 
-const MyGTKWindow *myWindow[10];
-
-static std::string filepath = "";
+std::shared_ptr<BandwidthData> bandwidthData;
+std::shared_ptr<MyGTKWindow> myWindow[10];
+std::string filepath;
 
 static void activate(GtkApplication* app/*, gpointer user_data*/)
 {
+    bandwidthData = std::shared_ptr<BandwidthData>(new BandwidthData(filepath));
+    
     for (auto i=0;i<1;i++)
-        myWindow[i] = new MyGTKWindow(app, filepath);
+    {
+        myWindow[i] = std::shared_ptr<MyGTKWindow>(new MyGTKWindow(app, std::shared_ptr<const BandwidthData>(bandwidthData)));
+        bandwidthData->RegisterListener(myWindow[i]);
+    }
 }
 
 static int
 command_line (GApplication            *application,
               GApplicationCommandLine *cmdline)
 {
-  gchar **argv;
-  gint argc;
-  gint i;
+    gchar **argv;
+    gint argc;
 
-  argv = g_application_command_line_get_arguments (cmdline, &argc);
+    argv = g_application_command_line_get_arguments (cmdline, &argc);
 
-  if (argc != 2)
-  {
-    g_application_command_line_print (cmdline, "Application requires path to data files\n");
-  }
-  else
-  {
-      filepath = argv[1];
-  }
+    if (argc != 2)
+    {
+        g_application_command_line_print (cmdline, "Application requires path to data files\n");
+    }
+    else
+    {
+        filepath = argv[1];
+    }
 
-  g_strfreev (argv);
+    g_strfreev (argv);
 
     g_application_activate(application);
     
@@ -44,8 +49,8 @@ command_line (GApplication            *application,
 
 int main(int argc, char **argv) 
 {
-  GtkApplication *app;
-
+  GtkApplication* app;
+  
   try
   {
     app = gtk_application_new(NULL, G_APPLICATION_HANDLES_COMMAND_LINE);
