@@ -16,8 +16,13 @@
 #include <dirent.h>
 #include <algorithm>
 #include <chrono>
+#include <fstream>
+#include <iostream>
 
 #include "BandwidthData.h"
+
+const int updateIntervalInMins = 5;
+const std::string cacheFile = "BandwidthDataCache.dat";
 
 BandwidthData::BandwidthData(const std::string& filepath)
 :m_filepath(filepath),
@@ -125,8 +130,56 @@ void BandwidthData::RegisterListener(std::shared_ptr<BandwidthDataListener> list
     m_listeners.push_back(listener);
 }
 
+const std::string BandwidthData::to_json() const
+{
+    const std::string newline = "\n\r";
+    const std::string continuation = ",";
+    
+    std::string json;
+
+    json += "{" + newline;
+
+    json += "\"Filenames\" : [" + newline;
+    int i = 0;
+    for (auto const& filename : m_filenames)
+        json += "\"" + filename + "\"" + (++i == m_filenames.size() ? "" : continuation) + newline;
+    json += "]" + continuation + newline;
+    
+    json += "\"Filedates\" : [" + newline;
+    i = 0;
+    for (auto const& filedate : m_filedates)
+        json += "\"" + filedate + "\"" + (++i == m_filedates.size() ? "" : continuation) + newline;
+    json += "]" + continuation + newline;
+    
+    json += "\"Days\" : [" + newline;
+    i = 0;
+    for (auto const& day : m_days)
+    {
+        json += "{" + newline;
+        json += "\"Date\" : \"" + day.first + "\"" + continuation + newline;
+        json += "\"Datapoints\" : " + day.second.get()->to_json() + newline;
+        json += "}" + (++i == m_days.size() ? "" : continuation) + newline;
+    }
+    json += "]" + newline;
+    
+    json += "}";
+    
+    return json;
+}
+
+void BandwidthData::from_json(const std::string& json)
+{
+    std::cout << "Blah";
+}
+
 void BandwidthData::UpdateThread()
 {
+    // Load the cache into memory.
+//    std::ifstream inFile;
+//    inFile.open(cacheFile, std::ios::in);
+//    from_json(inFile);
+//    inFile.close();
+    
     // Keep going until told to exit.
     while (!m_finishThread)
     {
@@ -134,11 +187,13 @@ void BandwidthData::UpdateThread()
         auto filenames = GetFileNames();
         
         // Has the set changed?
-        if (filenames->size() != m_files.size())
+        if (filenames->size() != m_filenames.size())
         {
+            std::cout << "New file(s) detected ../n/r";
+            
             // The set of files has changed.
             std::set<std::string> newFiles;
-            std::set_symmetric_difference(filenames->begin(), filenames->end(), m_files.begin(), m_files.end(), std::inserter(newFiles, newFiles.end()));
+            std::set_symmetric_difference(filenames->begin(), filenames->end(), m_filenames.begin(), m_filenames.end(), std::inserter(newFiles, newFiles.end()));
             
             for(auto const& it : newFiles)
             {
@@ -151,7 +206,7 @@ void BandwidthData::UpdateThread()
                     }
                     m_days.find(day)->second->LoadDataPoint(m_filepath, it);
                 }
-                m_files.insert(it);
+                m_filenames.insert(it);
             }
             
             // Send update to listeners.
@@ -160,7 +215,8 @@ void BandwidthData::UpdateThread()
                 it->BandwidthUpdated();
             }
         }
-        std::this_thread::sleep_for(std::chrono::minutes(1));
+        to_json();
+        std::this_thread::sleep_for(std::chrono::minutes(updateIntervalInMins));
     }
 }
 

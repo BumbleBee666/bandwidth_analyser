@@ -15,7 +15,7 @@
 
 #define DEF_PAD 10
 
-MyGTKCalendarWindow::MyGTKCalendarWindow(GtkApplication* app)
+MyGTKCalendarWindow::MyGTKCalendarWindow(const std::shared_ptr<GtkApplication>& app)
 {
     window = gtk_window_new (GTK_WINDOW_TOPLEVEL);
     

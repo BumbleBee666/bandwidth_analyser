@@ -48,6 +48,9 @@ public:
     // Registered listeners will receive a callback when the bandwidth data is updated.
     void RegisterListener(std::shared_ptr<BandwidthDataListener> listener);
 
+    const std::string to_json() const;
+    void from_json(const std::string& json);
+    
 private:
     std::unique_ptr<std::set<std::string>> GetFileNames() const;
     std::unique_ptr<std::set<std::string>> GetFileDates() const;
@@ -58,14 +61,12 @@ private:
     std::string m_filepath;
     std::set<std::string> m_filenames;
     std::set<std::string> m_filedates;
-    std::set<std::string> m_files;
     std::map<std::string, std::unique_ptr<BandwidthDay>> m_days;
 
     std::atomic<bool> m_finishThread;
     void UpdateThread();
     std::unique_ptr<std::thread> m_updateThread;
     std::mutex m_threadLock;
-
 };
 
 #endif /* BANDWIDTHDATA_H */

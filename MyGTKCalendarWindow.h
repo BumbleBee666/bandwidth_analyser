@@ -20,7 +20,7 @@
 
 class MyGTKCalendarWindow {
 public:
-    MyGTKCalendarWindow(GtkApplication* app);
+    MyGTKCalendarWindow(const std::shared_ptr<GtkApplication>& app);
     MyGTKCalendarWindow(const MyGTKCalendarWindow& orig);
     virtual ~MyGTKCalendarWindow();
     GtkWidget *window;

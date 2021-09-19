@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <gtk/gtk.h>
 #include <string>
+#include <memory>
 
 #include "MyGTKWindow.h"
 #include "BandwidthData.h"
@@ -11,7 +12,7 @@ std::shared_ptr<BandwidthData> bandwidthData;
 std::shared_ptr<MyGTKWindow> myWindow[10];
 std::string filepath;
 
-static void activate(GtkApplication* app/*, gpointer user_data*/)
+static void activate(GtkApplication *app/*, gpointer user_data*/)
 {
     bandwidthData = std::shared_ptr<BandwidthData>(new BandwidthData(filepath));
     
@@ -22,9 +23,7 @@ static void activate(GtkApplication* app/*, gpointer user_data*/)
     }
 }
 
-static int
-command_line (GApplication            *application,
-              GApplicationCommandLine *cmdline)
+static int command_line (GApplication* app, GApplicationCommandLine *cmdline)
 {
     gchar **argv;
     gint argc;
@@ -42,28 +41,30 @@ command_line (GApplication            *application,
 
     g_strfreev (argv);
 
-    g_application_activate(application);
+    g_application_activate(app);
     
     return 0;
 }
 
 int main(int argc, char **argv) 
 {
-  GtkApplication* app;
+    GtkApplication *app;
+        
+    try
+    {
+        app = gtk_application_new (NULL, G_APPLICATION_HANDLES_COMMAND_LINE);
+        
+        g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
+        g_signal_connect(app, "command-line", G_CALLBACK(command_line), NULL);
+
+        gtk_main_iteration_do (FALSE);
+        
+        g_application_run (G_APPLICATION(app), argc, argv);
+    }
+    catch (...)
+    {
+        g_object_unref (app);
+    }
   
-  try
-  {
-    app = gtk_application_new(NULL, G_APPLICATION_HANDLES_COMMAND_LINE);
-    g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
-    g_signal_connect(app, "command-line", G_CALLBACK(command_line), NULL);
-    
-    gtk_main_iteration_do(FALSE);
-    g_application_run(G_APPLICATION(app), argc, argv);
-  }
-  catch (...)
-  {
-      g_object_unref(app);
-  }
-  
-  return 0;
+    return 0;
 }

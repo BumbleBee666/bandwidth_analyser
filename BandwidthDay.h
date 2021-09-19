@@ -33,6 +33,9 @@ public:
     
     const std::string& Date() const { return m_date; }
     
+    const std::string to_json() const;
+    void from_json(const std::string& json);
+    
 private:
     std::string m_date;
     std::map<std::string, std::unique_ptr<const BandwidthDataPoint>> m_bandwidthData;

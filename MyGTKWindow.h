@@ -29,7 +29,7 @@
 class MyGTKWindow : public BandwidthDataListener
 {
 public:
-    MyGTKWindow(GtkApplication* app, std::shared_ptr<const BandwidthData> bandwidthData);
+    MyGTKWindow(GtkApplication *app, std::shared_ptr<const BandwidthData> bandwidthData);
     MyGTKWindow(const MyGTKWindow& orig);
     virtual ~MyGTKWindow();
     
@@ -37,7 +37,7 @@ public:
     virtual void BandwidthUpdated();
     
 private:    
-    static void DrawSurface (MyGTKWindow* myWindow);
+    static void DrawSurface (MyGTKWindow *myWindow);
     static gboolean Configure (GtkWidget *widget, GdkEventConfigure *event, gpointer data);
     static gboolean Draw (GtkWidget *widget, cairo_t *cr, gpointer data);
     static void SelectDay (GtkMenuItem *menuitem, gpointer data);
@@ -48,8 +48,7 @@ private:
     static void DrawStatisticalView(cairo_t *cr, const std::map<std::string, std::unique_ptr<BandwidthStatistics>>& statistics, int bandwidth_shift, int bandwidth_scale, int time_shift, int time_scale, int sample_rate_in_minutes);
     
 private:
-    GtkApplication *app;
-    GtkWidget *widget;
+    GtkApplication *m_app;
     GtkWidget *window;
     GtkWidget *label;
     GtkWidget *frame;
@@ -59,16 +58,21 @@ private:
     GtkWidget *dialog;
     GtkWidget *slider;
     GtkWidget *byMonth_item;
-        
+    GtkWidget *itemSelectData;
+    GtkWidget *subMenu;
+    GtkWidget *byDay_item;
+    GtkWidget *separator1;
+    GtkWidget *exit_item;
+    GtkWidget *byMonth_subMenu;
+    std::vector<GtkWidget*> m_menuItems;
+
     cairo_surface_t *surface;
             
-    static int width;
-    static int height;
+    static const int width;
+    static const int height;
     
     std::unique_ptr<std::set<std::string>> m_months;
-    GtkWidget *byMonth_subMenu;
-    std::vector<GtkCheckMenuItem*> m_menuItems;
-    MyGTKCalendarWindow* calendar;
+    std::unique_ptr<MyGTKCalendarWindow> calendar;
     
     std::shared_ptr<const BandwidthData> m_bandwidthData;
     
@@ -77,4 +81,3 @@ private:
 };
 
 #endif /* MYGTKWINDOW_H */
-

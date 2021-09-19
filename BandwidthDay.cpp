@@ -13,6 +13,8 @@
 
 #include <filesystem>
 #include <dirent.h>
+#include <fstream>
+#include <iostream>
 
 #include "BandwidthDay.h"
 #include "BandwidthFile.h"
@@ -49,6 +51,34 @@ const std::map<std::string, const std::unique_ptr<const BandwidthDataPoint>>& Ba
     return (const std::map<std::string, const std::unique_ptr<const BandwidthDataPoint>>&)m_bandwidthData; 
 }
    
+
+const std::string BandwidthDay::to_json() const
+{
+    const std::string newline = "\n\r";
+    const std::string continuation = ",";
+    
+    std::string json;
+
+    json += "[" + newline;
+
+    int i = 0;
+    for (auto const& data : m_bandwidthData)
+    {
+        json += "{" + newline;
+        json += "\"Time\" : \"" + data.first + "\"" + continuation + newline;
+        json += "\"Bandwidth\" : " + std::to_string(data.second->Bandwidth()) + newline;
+        json += "}" + (++i == m_bandwidthData.size() ? "" : continuation) + newline;
+    }
+    
+    json += "]";
+    
+    return json;
+}
+
+void BandwidthDay::from_json(const std::string& json)
+{
+    std::cout << "Blah";
+}
 
 void BandwidthDay::LoadData(const std::string& directory)
 {
