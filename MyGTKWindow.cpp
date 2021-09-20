@@ -16,8 +16,8 @@
 #include <ctime>
 #include <iostream>
 #include <string>
-#include <gtk-2.0/gtk/gtkwidget.h>
-#include <gtk-2.0/gtk/gtkdrawingarea.h>
+#include <gtk-3.0/gtk/gtkwidget.h>
+#include <gtk-3.0/gtk/gtkdrawingarea.h>
 #include <deque>
 #include <set>
 #include <algorithm>
