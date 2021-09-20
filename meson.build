@@ -1,6 +1,6 @@
 project('bandwidth_analyser', 'cpp',
   version : '0.1',
-  default_options : ['warning_level=3', 'cpp_std=c++11'])
+  default_options : ['warning_level=3', 'cpp_std=c++14'])
 
 gtkdep = dependency('gtk+-3.0')
 thread_dep = dependency('threads')
