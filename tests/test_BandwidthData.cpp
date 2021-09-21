@@ -2,9 +2,10 @@
 #include "gtest/gtest.h"
 
 // Tests factorial of negative numbers.
+// Comment
 TEST(BandwidthDataTest, Negative) {
   BandwidthData a("/bandwidth_analyser/");
-  EXPECT_GT(a.GetNoOfDays(), 0);
+  EXPECT_EQ(a.GetNoOfDays(), 0);
 }
 
 int main(int argc, char **argv) {
