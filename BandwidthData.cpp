@@ -39,6 +39,7 @@ BandwidthData::BandwidthData(const BandwidthData& orig)
 BandwidthData::~BandwidthData()
 {
     m_finishThread = true;
+    m_updateThread.join();
 }
 
 const BandwidthDay& BandwidthData::GetDay(const std::string& day) const 
