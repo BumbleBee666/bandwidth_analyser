@@ -25,10 +25,10 @@ install : true,
 dependencies : [gtkdep, thread_dep], 
 include_directories : incdir)
 
-// Need to create gtest subproject by ..
-// > meson wrap search gtest
-// > mkdir -p subprojects
-// > meson wrap install gtest
+# Need to create gtest subproject by ..
+# > meson wrap search gtest
+# > mkdir -p subprojects
+# > meson wrap install gtest
 gtest = subproject('gtest')
 
 subdir('tests')
