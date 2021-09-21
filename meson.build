@@ -32,3 +32,5 @@ include_directories : incdir)
 gtest = subproject('gtest')
 
 subdir('tests')
+
+test('mytest', all_tests, protocol : 'gtest')
