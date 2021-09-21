@@ -5,7 +5,7 @@ project('bandwidth_analyser', 'cpp',
 gtkdep = dependency('gtk+-3.0')
 thread_dep = dependency('threads')
 
-incdir = include_directories('/usr/include/c++/10/','/usr/include/aarch64-linux-gnu/c++/10/')
+incdir = include_directories('.','/usr/include/c++/10/','/usr/include/aarch64-linux-gnu/c++/10/')
 
 sources = [
 'bandwidth_analyser.cpp',
@@ -18,7 +18,13 @@ sources = [
 'BandwidthData.cpp'
 ]
 
-exe = executable('bandwidth_analyser', sources,
-  install : true, dependencies : [gtkdep, thread_dep], include_directories : incdir)
+exe = executable(
+'bandwidth_analyser', 
+sources,
+install : true, 
+dependencies : [gtkdep, thread_dep], 
+include_directories : incdir)
 
-test('basic', exe)
+gtest = subproject('gtest')
+
+subdir('tests')
