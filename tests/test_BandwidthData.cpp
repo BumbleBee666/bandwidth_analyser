@@ -5,7 +5,7 @@
  
 TEST(BandwidthDataTest, Negative) {
   BandwidthData a("..//tests//testdata//");
-  std::this_thread::sleep_for(std::chrono::seconds(10));
+  std::this_thread::sleep_for(std::chrono::seconds(20));
   EXPECT_EQ(a.GetNoOfDays(), 92);
 }
 
