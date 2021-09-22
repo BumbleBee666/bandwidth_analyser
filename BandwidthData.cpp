@@ -39,7 +39,8 @@ BandwidthData::BandwidthData(const BandwidthData& orig)
 BandwidthData::~BandwidthData()
 {
     m_finishThread = true;
-    m_updateThread->join();
+    if (m_updateThread != NULL)
+       m_updateThread->join();
 }
 
 const BandwidthDay& BandwidthData::GetDay(const std::string& day) const 
@@ -217,7 +218,7 @@ void BandwidthData::UpdateThread()
             }
         }
         to_json();
-        std::this_thread::sleep_for(std::chrono::minutes(updateIntervalInMins));
+//        std::this_thread::sleep_for(std::chrono::minutes(updateIntervalInMins));
     }
 }
 
