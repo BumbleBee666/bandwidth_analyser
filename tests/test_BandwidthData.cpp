@@ -1,11 +1,12 @@
 #include "BandwidthData.h"
 #include "gtest/gtest.h"
-
-// Tests factorial of negative numbers.
-// Comment
+#include <thread>         // std::this_thread::sleep_for
+#include <chrono>         // std::chrono::seconds
+ 
 TEST(BandwidthDataTest, Negative) {
-  BandwidthData a("/bandwidth_analyser/");
-  EXPECT_EQ(a.GetNoOfDays(), 0);
+  BandwidthData a("..//tests//testdata//");
+  std::this_thread::sleep_for(std::chrono::seconds(10));
+  EXPECT_EQ(a.GetNoOfDays(), 92);
 }
 
 int main(int argc, char **argv) {
