@@ -21,6 +21,7 @@
 #include <atomic>
 #include <thread>
 #include <mutex>
+#include <condition_variable>
 #include <memory>
 
 #include "BandwidthStatistics.h"
@@ -67,6 +68,13 @@ private:
     void UpdateThread();
     std::unique_ptr<std::thread> m_updateThread;
     std::mutex m_threadLock;
+
+    template<class Duration>
+    bool wait_for(Duration duration);
+
+    std::condition_variable c_;
+    std::mutex m_;
+    bool stop_;
 };
 
 #endif /* BANDWIDTHDATA_H */

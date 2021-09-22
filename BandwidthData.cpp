@@ -26,7 +26,8 @@ const std::string cacheFile = "BandwidthDataCache.dat";
 
 BandwidthData::BandwidthData(const std::string& filepath)
 :m_filepath(filepath),
- m_finishThread(false)
+ m_finishThread(false),
+ stop_(false)
 {
     m_updateThread = std::unique_ptr<std::thread>(new std::thread(&BandwidthData::UpdateThread, this));
 }
@@ -39,8 +40,12 @@ BandwidthData::BandwidthData(const BandwidthData& orig)
 BandwidthData::~BandwidthData()
 {
     m_finishThread = true;
-    if (m_updateThread != NULL)
-       m_updateThread->join();
+    {
+	std::lock_guard<std::mutex> l(m_);
+	stop_ = true;
+    }
+    c_.notify_one();
+    m_updateThread->join();
 }
 
 const BandwidthDay& BandwidthData::GetDay(const std::string& day) const 
@@ -218,8 +223,15 @@ void BandwidthData::UpdateThread()
             }
         }
         to_json();
-//        std::this_thread::sleep_for(std::chrono::minutes(updateIntervalInMins));
+	while (wait_for(std::chrono::minutes(updateIntervalInMins)));
     }
+}
+
+template<class Duration>
+bool BandwidthData::wait_for(Duration duration)
+{
+	std::unique_lock<std::mutex> l(m_);
+	return !c_.wait_for(l, duration, [this]() { return stop_; });
 }
 
 std::unique_ptr<std::map<std::string, std::unique_ptr<BandwidthStatistics>>> BandwidthData::GetStatistics() const
