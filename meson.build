@@ -33,4 +33,5 @@ gtest = subproject('gtest')
 
 subdir('tests')
 
+add_test_setup('mytest', timeout_multiplier : 4)
 test('mytest', all_tests, protocol : 'gtest')
