@@ -10,3 +10,12 @@ Currently the month is hardcoded.  As is the use of month for the graph.
 Improvements would be to display daily actual speeds rather than average over month.
 Obviously allowing selection of month from app would make sense.
 
+Jenkins build config..
+mkdir -p subprojects
+meson wrap install gtest
+meson setup build
+cd tests
+unzip testdata.zip
+cd ..
+cd build
+meson test --setup='test_setup'
