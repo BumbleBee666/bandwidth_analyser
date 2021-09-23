@@ -196,7 +196,7 @@ void BandwidthData::UpdateThread()
         // Has the set changed?
         if (filenames->size() != m_filenames.size())
         {
-            std::cout << "New file(s) detected ../n/r";
+            std::cout << "New file(s) detected ..\n\r";
             
             // The set of files has changed.
             std::set<std::string> newFiles;
