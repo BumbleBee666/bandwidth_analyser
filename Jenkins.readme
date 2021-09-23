@@ -1,0 +1,9 @@
+Jenkins build/test commands ..
+mkdir -p subprojects
+meson wrap install gtest
+meson setup build
+cd tests
+unzip testdata.zip
+cd ..
+cd build
+meson test --setup='test_setup'
