@@ -222,7 +222,7 @@ void BandwidthData::UpdateThread()
                 it->BandwidthUpdated();
             }
         }
-        to_json();
+//        to_json();
 	while (wait_for(std::chrono::minutes(updateIntervalInMins)));
     }
 }
