@@ -44,7 +44,7 @@ int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
 
   bandwidthData = std::make_unique<BandwidthData>(testdata);
-  std::this_thread::sleep_for(std::chrono::seconds(30));
+  std::this_thread::sleep_for(std::chrono::seconds(60));
 
   return RUN_ALL_TESTS();
 }
