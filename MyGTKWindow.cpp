@@ -29,137 +29,149 @@
 
 #include "MyGTKWindow.h"
 
-const int MyGTKWindow::width = 1460;
-const int MyGTKWindow::height = 700;
+const int initial_width = 1460;
+const int initial_height = 700;
+
+const std::string strFile = "File";
+const std::string strExit= "Exit";
 
 const std::string strSelectData = "Select Data";
 const std::string strByMonth = "By Month";
 const std::string strByDay= "By Day";
-const std::string strExit= "Exit";
 
-MyGTKWindow::MyGTKWindow(GtkApplication *app, std::shared_ptr<const BandwidthData> bandwidthData)
-: m_app(app), m_bandwidthData(bandwidthData), selected_day(""), surface(NULL), box1(NULL)
+const int averaging_range = 10;
+
+MyGTKWindow::MyGTKWindow(GtkApplication *app, std::shared_ptr<const BandwidthData> bandwidthData) : 
+        m_app(app),
+        m_bandwidthData(bandwidthData),
+        m_width(initial_width),
+        m_height(initial_height),
+        m_slider(NULL),
+        m_surface(NULL)
 {
-    window = gtk_application_window_new (m_app);
+    m_window = gtk_application_window_new (m_app);
 
-    gtk_window_set_title(GTK_WINDOW (window), "Welcome to GNOME");
-    gtk_window_set_default_size(GTK_WINDOW (window), width, height);
-    
-    DrawWindow();
-}
-
-void MyGTKWindow::DrawWindow()
-{
-    if (box1 != NULL)
-    {
-        gtk_widget_destroy (box1);
-    }
+    gtk_window_set_title (GTK_WINDOW (m_window), "Welcome to GNOME");
+    gtk_window_set_default_size (GTK_WINDOW (m_window), m_width, m_height);
     
     // Create a box, and add it to the window.
-    box1 = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-    gtk_container_add (GTK_CONTAINER (window), box1);
+    m_box = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
+    gtk_container_add (GTK_CONTAINER (m_window), m_box);
 
-    // Create a menu, and add it to the box.
-    menu = gtk_menu_bar_new ();
-    gtk_box_pack_start (GTK_BOX (box1), menu, FALSE, FALSE, 0);
+    // Create a menu bar, and add it to the box.
+    m_menubar = gtk_menu_bar_new ();
+    gtk_box_pack_start (GTK_BOX (m_box), m_menubar, FALSE, FALSE, 0);
 
-    // Create the Select Data menu item, and add it to the main menu.
-    itemSelectData = gtk_menu_item_new_with_label (strSelectData.c_str());
-    gtk_menu_shell_append (GTK_MENU_SHELL (menu), itemSelectData);
+    // Create the File menu.
+    m_fileItem = gtk_menu_item_new_with_label (strFile.c_str());
+    gtk_menu_shell_append (GTK_MENU_SHELL (m_menubar), m_fileItem);
+    m_fileMenu = gtk_menu_new ();
+    gtk_menu_item_set_submenu (GTK_MENU_ITEM (m_fileItem), m_fileMenu);
+    m_exitItem = gtk_menu_item_new_with_label(strExit.c_str());
+    gtk_menu_shell_append (GTK_MENU_SHELL (m_fileMenu), m_exitItem );
 
-    // Create the sub menu for the Select Data menu item, and add it to the Select Data menu item.
-    subMenu = gtk_menu_new ();
-    gtk_menu_item_set_submenu (GTK_MENU_ITEM (itemSelectData), subMenu);
+    // Create the Select Data menu.
+    m_selectDataItem = gtk_menu_item_new_with_label (strSelectData.c_str());
+    gtk_menu_shell_append (GTK_MENU_SHELL (m_menubar), m_selectDataItem);
+    m_selectDataMenu = gtk_menu_new ();
+    gtk_menu_item_set_submenu (GTK_MENU_ITEM (m_selectDataItem), m_selectDataMenu);
+    m_selectDataByMonthItem = gtk_menu_item_new_with_label (strByMonth.c_str());
+    gtk_menu_shell_append (GTK_MENU_SHELL (m_selectDataMenu), m_selectDataByMonthItem);
+    m_selectDataByMonthMenu = gtk_menu_new ();
+    gtk_menu_item_set_submenu (GTK_MENU_ITEM (m_selectDataByMonthItem), m_selectDataByMonthMenu);
+    CreateSelectDataByMonthMenu();
+    m_selectDataByDayItem = gtk_menu_item_new_with_label (strByDay.c_str());
+    gtk_menu_shell_append (GTK_MENU_SHELL (m_selectDataMenu), m_selectDataByDayItem);
+    g_signal_connect (m_selectDataByDayItem, "activate", G_CALLBACK (SelectDay), this);
 
-    // Create the By Month menu item, and add it to the Select Data menu item.
-    byMonth_item = gtk_menu_item_new_with_label(strByMonth.c_str());
-    gtk_menu_shell_append (GTK_MENU_SHELL (subMenu), byMonth_item);
+    // Create a frame, and add it to the box.
+    m_frame = gtk_frame_new (NULL);
+    gtk_frame_set_shadow_type (GTK_FRAME (m_frame), GTK_SHADOW_IN);
+    gtk_container_add (GTK_CONTAINER (m_box), m_frame);
+
+    // Create a drawing area, and add it to the frame.
+    m_drawingArea = gtk_drawing_area_new ();
+    gtk_widget_set_size_request (m_drawingArea, m_width, m_height);
+    gtk_container_add (GTK_CONTAINER (m_frame), m_drawingArea);
+    g_signal_connect (m_drawingArea, "configure-event", G_CALLBACK (Configure), this);
+    g_signal_connect (m_drawingArea, "draw", G_CALLBACK (Draw), this);
+
+    // Create a slider, and add it to the frame.
+    double max = m_bandwidthData->GetNoOfDays() == 0 ? 1.0 : m_bandwidthData->GetNoOfDays() - 1;
+    m_slider = gtk_hscale_new_with_range (0.0, max, 1.0);
+    gtk_container_add (GTK_CONTAINER (m_box), m_slider);
+    g_signal_connect (m_slider, "format-value", G_CALLBACK (FormatValue), this);
+    g_signal_connect (m_slider, "value-changed", G_CALLBACK (ValueChanged), this);
     
-    // Create the sub menu for the By Month menu item, and add it to the By Month menu item.
-    byMonth_subMenu = gtk_menu_new ();
-    gtk_menu_item_set_submenu (GTK_MENU_ITEM (byMonth_item), byMonth_subMenu);
+    gtk_widget_show_all (m_window);
+}
+
+void MyGTKWindow::CreateSelectDataByMonthMenu()
+{
+    std::unique_ptr<std::set<std::string>> months = m_bandwidthData->GetMonths();
+
+    std::set<std::string> newMonths;
+    std::set_symmetric_difference(months->begin(), months->end(), m_months.begin(), m_months.end(), std::inserter(newMonths, newMonths.end()));
     
-    m_menuItems.clear();
-    m_months = m_bandwidthData->GetMonths();
-    for (auto const& it : *m_months)
+    for (auto const& month : newMonths)
     {
-        auto month_item = gtk_check_menu_item_new_with_label(it.c_str());
-        gtk_check_menu_item_set_active (GTK_CHECK_MENU_ITEM (month_item), true);
-        g_signal_connect (month_item, "toggled", G_CALLBACK (Toggled), this);
-        gtk_menu_shell_append (GTK_MENU_SHELL (byMonth_subMenu), month_item );
-        
-        m_menuItems.push_back (month_item);
+        GtkWidget *monthItem = gtk_check_menu_item_new_with_label (month.c_str());
+        gtk_check_menu_item_set_active (GTK_CHECK_MENU_ITEM (monthItem), true);
+        gtk_menu_shell_append (GTK_MENU_SHELL (m_selectDataByMonthMenu), monthItem);
+        g_signal_connect (monthItem, "toggled", G_CALLBACK (Toggled), this);
+
+        m_months.insert(month);
+        m_selectDataByMonthMenuMonthItems.push_back (monthItem);
     }
-
-    byDay_item = gtk_menu_item_new_with_label(strByDay.c_str());
-    gtk_menu_shell_append (GTK_MENU_SHELL (subMenu), byDay_item );
-    g_signal_connect (byDay_item, "activate", G_CALLBACK (SelectDay), this);
-
-    separator1 = gtk_separator_menu_item_new();
-    gtk_menu_shell_append (GTK_MENU_SHELL (subMenu), separator1 );
-    
-    exit_item = gtk_menu_item_new_with_label(strExit.c_str());
-    gtk_menu_shell_append (GTK_MENU_SHELL (subMenu), exit_item );
-
-    frame = gtk_frame_new(NULL);
-    gtk_frame_set_shadow_type (GTK_FRAME (frame), GTK_SHADOW_IN);
-    gtk_container_add (GTK_CONTAINER (box1), frame);
-
-    drawing_area = gtk_drawing_area_new();
-    
-    /* set a minimum size */
-    gtk_widget_set_size_request (drawing_area, width, height);
-
-    gtk_container_add (GTK_CONTAINER (frame), drawing_area);
-
-    /* Signals used to handle the backing surface */
-    g_signal_connect (drawing_area,"configure-event", G_CALLBACK (Configure), this);
-    g_signal_connect (drawing_area, "draw", G_CALLBACK (Draw), this);
-
-    int max = m_bandwidthData->GetNoOfDays() == 0 ? 1 : m_bandwidthData->GetNoOfDays();
-    slider = gtk_scale_new_with_range (GTK_ORIENTATION_HORIZONTAL, 0, max, 1.0);
-    gtk_container_add (GTK_CONTAINER (box1), slider);
-    g_signal_connect (slider, "format-value", G_CALLBACK (FormatValue), this);
-    g_signal_connect (slider, "value-changed", G_CALLBACK (ValueChanged), this);
-    
-    gtk_widget_show_all (window);
 }
 
 void MyGTKWindow::ValueChanged (GtkRange *range, gpointer data)
 {
     MyGTKWindow *myWindow = (MyGTKWindow*)data;
-    
-    int i = 0;
-    int iVal = gtk_range_get_value(range);
-    int iStartVal = iVal - 10;
-    if (iStartVal < 0) iStartVal = 0;
-    int iEndVal = iVal + 10;
-    if (iEndVal >= myWindow->m_bandwidthData->GetNoOfDays()) iEndVal = myWindow->m_bandwidthData->GetNoOfDays() - 1;
-    for (auto const& it_day : myWindow->m_bandwidthData->GetDays())
+
+    // Get the current value.
+    int value = gtk_range_get_value (range);
+
+    int startValue = value - averaging_range;
+    if (startValue < 0)
     {
-        if (i==iStartVal)
+        startValue = 0;
+    }
+   
+    int endValue = value + averaging_range;
+    if (endValue >= myWindow->m_bandwidthData->GetNoOfDays())
+    {
+        endValue = myWindow->m_bandwidthData->GetNoOfDays() - 1;
+    }
+
+    int i = 0;
+    for (auto const& day : myWindow->m_bandwidthData->GetDays())
+    {
+        if (i == startValue)
         {
-            myWindow->start_day = it_day.second->Date();
+            myWindow->m_startDay = day.second->Date();
         }
-        if (i==iEndVal)
+        if (i == endValue)
         {
-            myWindow->end_day = it_day.second->Date();
+            myWindow->m_endDay = day.second->Date();
         }
         i++;
     }
 
-    myWindow->selected_day = "";
-    
-    DrawSurface(myWindow);
-    
-    gtk_widget_queue_draw(GTK_WIDGET(myWindow->drawing_area));
+    myWindow->m_selectedDay = "";
+
+    gtk_widget_queue_draw (myWindow->m_drawingArea);
 }
 
 void MyGTKWindow::BandwidthUpdated()
 {
-    DrawWindow();
+    CreateSelectDataByMonthMenu();
+    double max = m_bandwidthData->GetNoOfDays() == 0 ? 1.0 : m_bandwidthData->GetNoOfDays() - 1;
+    gtk_range_set_range (GTK_RANGE(m_slider), 0.0, max);
+    
+    gtk_widget_queue_draw (m_drawingArea);
 
-    gtk_widget_queue_draw(drawing_area);
+    gtk_widget_show_all (m_window);
 }
 
 gchar* MyGTKWindow::FormatValue(GtkScale *scale, gdouble value, gpointer data)
@@ -170,10 +182,10 @@ gchar* MyGTKWindow::FormatValue(GtkScale *scale, gdouble value, gpointer data)
     
     int i = 0;
     int iDate = 0;
-    for (auto const& it_day : myWindow->m_bandwidthData->GetDays())
+    for (auto const& day : myWindow->m_bandwidthData->GetDays())
     {
         if (i==iVal)
-            iDate = atoi(it_day.second->Date().c_str());
+            iDate = atoi(day.second->Date().c_str());
         i++;
     }
     
@@ -192,37 +204,35 @@ void MyGTKWindow::Toggled (GtkCheckMenuItem *menuitem, gpointer data)
 {    
     MyGTKWindow *myWindow = (MyGTKWindow*)data;
     
-    myWindow->selected_day = "";
-    myWindow->start_day = "";
+    myWindow->m_selectedDay = "";
+    myWindow->m_startDay = "";
 
-    DrawSurface(myWindow);
-    
-    gtk_widget_queue_draw(myWindow->drawing_area);
+    gtk_widget_queue_draw (myWindow->m_drawingArea);
 }
 
 void MyGTKWindow::SelectDay (GtkMenuItem *menuitem, gpointer data)
 {    
     MyGTKWindow *myWindow = (MyGTKWindow*)data;
 
-    myWindow->dialog = gtk_dialog_new();
+    myWindow->m_dialog = gtk_dialog_new();
     
-    gtk_window_set_position(GTK_WINDOW(myWindow->dialog), GTK_WIN_POS_CENTER_ON_PARENT);
+    gtk_window_set_position (GTK_WINDOW(myWindow->m_dialog), GTK_WIN_POS_CENTER_ON_PARENT);
 
     GtkWidget *calendar = gtk_calendar_new ();
     gtk_calendar_mark_day (GTK_CALENDAR (calendar), 19);	
     
-    GtkWidget *content_area = gtk_dialog_get_content_area (GTK_DIALOG(myWindow->dialog));
-    gtk_box_pack_start(GTK_BOX(content_area), calendar, TRUE, TRUE, 5);
+    GtkWidget *content_area = gtk_dialog_get_content_area (GTK_DIALOG(myWindow->m_dialog));
+    gtk_box_pack_start (GTK_BOX(content_area), calendar, TRUE, TRUE, 5);
 
     g_signal_connect (calendar, "day-selected-double-click", G_CALLBACK (DayDoubleClicked), data);
     
-    gtk_widget_show_all(GTK_WIDGET(myWindow->dialog));
+    gtk_widget_show_all (GTK_WIDGET(myWindow->m_dialog));
     
-    gtk_dialog_run(GTK_DIALOG(myWindow->dialog));
+    gtk_dialog_run (GTK_DIALOG(myWindow->m_dialog));
     
-    gtk_widget_destroy(GTK_WIDGET(myWindow->dialog));
-    
-    DrawSurface(myWindow);
+    gtk_widget_destroy (GTK_WIDGET(myWindow->m_dialog));
+
+    gtk_widget_queue_draw (myWindow->m_drawingArea);
 }
 
 void MyGTKWindow::DayDoubleClicked (GtkCalendar *calendar, gpointer data)
@@ -237,16 +247,17 @@ void MyGTKWindow::DayDoubleClicked (GtkCalendar *calendar, gpointer data)
     
     char buffer[50];
     sprintf(buffer, "%04d%02d%02d", year, month+1, day);
-    myWindow->selected_day = buffer;
+    myWindow->m_selectedDay = buffer;
     
-    gtk_dialog_response(GTK_DIALOG(myWindow->dialog), 0);
+    gtk_dialog_response(GTK_DIALOG(myWindow->m_dialog), 0);
+
+    gtk_widget_queue_draw (myWindow->m_drawingArea);
 }
 
 void MyGTKWindow::DrawSurface (MyGTKWindow *myWindow)
 {
-    cairo_t *cr;
-
-    cr = cairo_create (myWindow->surface);
+    // Create our context.
+    cairo_t *cr = cairo_create (myWindow->m_surface);
 
     // Clear background to white.
     cairo_set_source_rgb (cr, 1, 1, 1);
@@ -258,17 +269,17 @@ void MyGTKWindow::DrawSurface (MyGTKWindow *myWindow)
     int time_shift = 10;
     int time_scale = 5;
 
-    int bandwidth_shift = gtk_widget_get_allocated_height(GTK_WIDGET(myWindow->drawing_area)) - 50;
+    int bandwidth_shift = gtk_widget_get_allocated_height (GTK_WIDGET(myWindow->m_drawingArea)) - 50;
     int bandwidth_scale = 8;
     
     int sample_rate_in_minutes = 5;
     
-    if (!myWindow->selected_day.empty())
+    if (!myWindow->m_selectedDay.empty())
     {
         // We need to show the chart for a specific day.
         try
         {
-            auto const& day = myWindow->m_bandwidthData->GetDay(myWindow->selected_day);
+            auto const& day = myWindow->m_bandwidthData->GetDay(myWindow->m_selectedDay);
             cairo_set_source_rgb (cr, 0, 0, 0);
             int x = 0;
             for (auto const& datapoint : day.DataPoints())
@@ -293,18 +304,18 @@ void MyGTKWindow::DrawSurface (MyGTKWindow *myWindow)
         catch (std::invalid_argument)
         {}
     }
-    else if (!myWindow->start_day.empty())
+    else if (!myWindow->m_startDay.empty())
     {
         auto const& months = myWindow->m_bandwidthData->GetMonths();
         for(auto const& month_it : *months)
         {
             // Should we draw this month?
-            for (auto const& menu_it : myWindow->m_menuItems)
+            for (auto const& menu_it : myWindow->m_selectDataByMonthMenuMonthItems)
             {
                 if (month_it.compare(gtk_menu_item_get_label(GTK_MENU_ITEM(menu_it))) == 0 && gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(menu_it)))
                 {
                     // Yes, so we need to retrieve the statistics for this month.
-                    auto statistics = myWindow->m_bandwidthData->GetStatistics(myWindow->start_day, myWindow->end_day);
+                    auto statistics = myWindow->m_bandwidthData->GetStatistics(myWindow->m_startDay, myWindow->m_endDay);
                     
                     DrawStatisticalView(cr, *statistics, bandwidth_shift, bandwidth_scale, time_shift, time_scale, sample_rate_in_minutes);
                 }
@@ -317,7 +328,7 @@ void MyGTKWindow::DrawSurface (MyGTKWindow *myWindow)
         for(auto const& month_it : *months)
         {
             // Should we draw this month?
-            for (auto const& menu_it : myWindow->m_menuItems)
+            for (auto const& menu_it : myWindow->m_selectDataByMonthMenuMonthItems)
             {
                 if (month_it.compare(gtk_menu_item_get_label(GTK_MENU_ITEM(menu_it))) == 0 && gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(menu_it)))
                 {
@@ -362,11 +373,14 @@ void MyGTKWindow::DrawSurface (MyGTKWindow *myWindow)
         cairo_stroke (cr);
     }
     
+    // Destroy our context.
     cairo_destroy (cr);
 }
 
 void MyGTKWindow::DrawStatisticalView (cairo_t *cr, const std::map<std::string, std::unique_ptr<BandwidthStatistics>>& statistics, int bandwidth_shift, int bandwidth_scale, int time_shift, int time_scale, int sample_rate_in_minutes)
 {
+    try
+    {
     cairo_set_source_rgba (cr, 1, 0, 0, 0.5);
     int x = 0;
     std::deque<int> high_av;
@@ -429,24 +443,36 @@ void MyGTKWindow::DrawStatisticalView (cairo_t *cr, const std::map<std::string, 
         }
     }
     cairo_stroke (cr);
+    }
+    catch (...)
+    {
+        std::cout << "Caught exception in DrawStatisticalView" << std::endl;
+    }
 }
 
 gboolean MyGTKWindow::Configure (GtkWidget *widget, GdkEventConfigure *event, gpointer data)
 {
-    MyGTKWindow *myWindow = (MyGTKWindow*)data;
-
-    if (myWindow->surface != NULL)
+    MyGTKWindow* myWindow = (MyGTKWindow*)data;
+    
+    bool recreateSurface = false;
+    if (myWindow->m_surface == NULL || event->height != myWindow->m_height || event->width != myWindow->m_width)
     {
-        cairo_surface_destroy (myWindow->surface);
+        MyGTKWindow *myWindow = (MyGTKWindow*)data;
+
+        if (myWindow->m_surface != NULL)
+        {
+            // We have an existing surface, so we'll destroy it first.
+            cairo_surface_destroy (myWindow->m_surface);
+        }
+
+        myWindow->m_surface = gdk_window_create_similar_surface (event->window, CAIRO_CONTENT_COLOR, event->width, event->height);
+
+        // Make sure we know the size of our surface.
+        myWindow->m_height = event->height;
+        myWindow->m_width = event->width;
+
+        gtk_widget_queue_draw (myWindow->m_drawingArea);
     }
-
-    myWindow->surface = gdk_window_create_similar_surface (
-            gtk_widget_get_window (widget),
-            CAIRO_CONTENT_COLOR,
-            gtk_widget_get_allocated_width (widget),
-            gtk_widget_get_allocated_height (widget) );
-
-    DrawSurface (myWindow);
 
     /* We've handled the configure event, no need for further processing. */
     return TRUE;
@@ -456,9 +482,19 @@ gboolean MyGTKWindow::Draw (GtkWidget *widget, cairo_t *cr, gpointer data)
 {
     MyGTKWindow* myWindow = (MyGTKWindow*)data;
 
-    // Paint our window using the source surface.
-    cairo_set_source_surface (cr, myWindow->surface, 0, 0);
-    cairo_paint (cr);
+    if (myWindow->m_surface != NULL)
+    {
+        // Draw onto our surface.
+        DrawSurface (myWindow);
+        
+        // Paint our window using the source surface.
+        cairo_set_source_surface (cr, myWindow->m_surface, 0, 0);
+        cairo_paint (cr);
+    }
+    else
+    {
+        std::cout << "An attempt was made to draw the window, but the drawing surface is NULL" << std::endl;
+    }
 
     return FALSE;
 }

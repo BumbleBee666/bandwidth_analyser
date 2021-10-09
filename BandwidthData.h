@@ -24,11 +24,12 @@
 #include <condition_variable>
 #include <memory>
 
+#include "JSONBase.h"
 #include "BandwidthStatistics.h"
 #include "BandwidthDay.h"
 #include "BandwidthDataListener.h"
 
-class BandwidthData 
+class BandwidthData : public JSONBase
 {
 public:
     BandwidthData(const std::string& filepath);
@@ -49,19 +50,18 @@ public:
     // Registered listeners will receive a callback when the bandwidth data is updated.
     void RegisterListener(std::shared_ptr<BandwidthDataListener> listener);
 
-    const std::string to_json() const;
-    void from_json(const std::string& json);
+    virtual bool Deserialize(const rapidjson::Value& obj);
+    virtual bool Serialize(rapidjson::Writer<rapidjson::StringBuffer>* writer) const;
     
 private:
     std::unique_ptr<std::set<std::string>> GetFileNames() const;
-    std::unique_ptr<std::set<std::string>> GetFileDates() const;
-    std::unique_ptr<std::set<std::string>> GetFileMonths() const;
 
+    std::unique_ptr<std::map<std::string, std::unique_ptr<BandwidthStatistics>>> GetStatistics(std::map<std::string, std::vector<double>>& bandwidthsByTime) const;
+        
     std::vector<std::shared_ptr<BandwidthDataListener>> m_listeners;
 
     std::string m_filepath;
     std::set<std::string> m_filenames;
-    std::set<std::string> m_filedates;
     std::map<std::string, std::unique_ptr<BandwidthDay>> m_days;
 
     std::atomic<bool> m_finishThread;

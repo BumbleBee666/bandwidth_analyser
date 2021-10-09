@@ -106,86 +106,50 @@ std::unique_ptr<std::set<std::string>> BandwidthData::GetFileNames() const
     return filenames;
 }
 
-std::unique_ptr<std::set<std::string>> BandwidthData::GetFileDates() const
-{
-    std::unique_ptr<std::set<std::string>> filedates( new std::set<std::string>());
-    
-    for(auto const& it : *GetFileNames())
-    {
-        int pos = it.find("results_", 0);
-        filedates->insert(it.substr(pos+8, 8));
-    }   
-    
-    return filedates;
-}
-
-std::unique_ptr<std::set<std::string>> BandwidthData::GetFileMonths() const
-{
-    std::unique_ptr<std::set<std::string>> filemonths(new std::set<std::string>());
-
-    for(auto const& it : *GetFileNames())
-    {
-        int pos = it.find("results_", 0);
-        filemonths->insert(it.substr(pos+8, 6));
-    }
-    
-    return filemonths;
-}
-
 void BandwidthData::RegisterListener(std::shared_ptr<BandwidthDataListener> listener)
 {
     m_listeners.push_back(listener);
 }
 
-const std::string BandwidthData::to_json() const
+bool BandwidthData::Serialize(rapidjson::Writer<rapidjson::StringBuffer>* writer) const
 {
-    const std::string newline = "\n\r";
-    const std::string continuation = ",";
-    
-    std::string json;
-
-    json += "{" + newline;
-
-    json += "\"Filenames\" : [" + newline;
-    int i = 0;
+    writer->StartObject();
+    writer->Key("FileNames");
+    writer->StartArray();
     for (auto const& filename : m_filenames)
-        json += "\"" + filename + "\"" + (++i == m_filenames.size() ? "" : continuation) + newline;
-    json += "]" + continuation + newline;
-    
-    json += "\"Filedates\" : [" + newline;
-    i = 0;
-    for (auto const& filedate : m_filedates)
-        json += "\"" + filedate + "\"" + (++i == m_filedates.size() ? "" : continuation) + newline;
-    json += "]" + continuation + newline;
-    
-    json += "\"Days\" : [" + newline;
-    i = 0;
+        writer->String(filename.c_str());
+    writer->EndArray();
+    writer->Key("Days");
+    writer->StartArray();
     for (auto const& day : m_days)
-    {
-        json += "{" + newline;
-        json += "\"Date\" : \"" + day.first + "\"" + continuation + newline;
-        json += "\"Datapoints\" : " + day.second.get()->to_json() + newline;
-        json += "}" + (++i == m_days.size() ? "" : continuation) + newline;
-    }
-    json += "]" + newline;
-    
-    json += "}";
-    
-    return json;
+        day.second->Serialize(writer);
+    writer->EndArray();
+    writer->EndObject();
+
+    return true;
 }
 
-void BandwidthData::from_json(const std::string& json)
+bool BandwidthData::Deserialize(const rapidjson::Value& obj)
 {
-    std::cout << "Blah";
+    rapidjson::Value::ConstArray filenames = obj["FileNames"].GetArray();
+    for (rapidjson::Value::ConstValueIterator it = filenames.Begin(); it != filenames.End(); ++it)
+    {
+        m_filenames.insert(it->GetString());
+    }    
+    rapidjson::Value::ConstArray days = obj["Days"].GetArray();
+    for (rapidjson::Value::ConstValueIterator it = days.Begin(); it != days.End(); ++it)
+    {
+        auto bandwidthDay = std::unique_ptr<BandwidthDay>(new BandwidthDay(it->GetObject()));
+        m_days[bandwidthDay->Date()] = std::move(bandwidthDay);
+    }    
+
+    return true;
 }
 
 void BandwidthData::UpdateThread()
 {
     // Load the cache into memory.
-//    std::ifstream inFile;
-//    inFile.open(cacheFile, std::ios::in);
-//    from_json(inFile);
-//    inFile.close();
+//    JSONBase::DeserializeFromFile(cacheFile);
     
     // Keep going until told to exit.
     while (!m_finishThread)
@@ -196,8 +160,6 @@ void BandwidthData::UpdateThread()
         // Has the set changed?
         if (filenames->size() != m_filenames.size())
         {
-            std::cout << "New file(s) detected ..\n\r";
-            
             // The set of files has changed.
             std::set<std::string> newFiles;
             std::set_symmetric_difference(filenames->begin(), filenames->end(), m_filenames.begin(), m_filenames.end(), std::inserter(newFiles, newFiles.end()));
@@ -216,13 +178,18 @@ void BandwidthData::UpdateThread()
                 m_filenames.insert(it);
             }
             
-            // Send update to listeners.
-            for (auto it : m_listeners)
-            {
-                it->BandwidthUpdated();
-            }
+            // Write the new data set to our cache file.
+//            JSONBase::SerializeToFile(cacheFile);
         }
-//        to_json();
+    
+//        std::cout << JSONBase::Serialize() << std::endl;
+    
+        // Send update to listeners.
+        for (auto it : m_listeners)
+        {
+            it->BandwidthUpdated();
+        }
+
 	while (wait_for(std::chrono::minutes(updateIntervalInMins)));
     }
 }
@@ -234,96 +201,83 @@ bool BandwidthData::wait_for(Duration duration)
 	return !c_.wait_for(l, duration, [this]() { return stop_; });
 }
 
-std::unique_ptr<std::map<std::string, std::unique_ptr<BandwidthStatistics>>> BandwidthData::GetStatistics() const
+std::unique_ptr<std::map<std::string, std::unique_ptr<BandwidthStatistics>>> BandwidthData::GetStatistics(std::map<std::string, std::vector<double>>& bandwidthsByTime) const
 {
-    auto statistics = std::unique_ptr<std::map<std::string, std::unique_ptr<BandwidthStatistics>>>(new std::map<std::string, std::unique_ptr<BandwidthStatistics>>());
-
-    // Build our daily averages.
-    std::map<std::string, std::vector<double>> averages;
-    
-    for (auto const& it_day : m_days)
-    {
-        for (auto const& it_dp : it_day.second->DataPoints())
-        {
-            std::map<std::string, std::vector<double>>::const_iterator it_time = averages.find(it_dp.first);
-            if (it_time == averages.end())
-            {
-                averages[it_dp.first] = std::vector<double>();
-            }
-            averages[it_dp.first].push_back(it_dp.second->Bandwidth());
-        }
-    }
-    
-    for (auto const& it_average : averages)
+    auto statistics = std::make_unique<std::map<std::string, std::unique_ptr<BandwidthStatistics>>>();
+            
+    for (auto const& bandwidths : bandwidthsByTime)
     {
         double high = 0.0;
         double low = 80.0;
         double average = 0.0;
 
-        for (auto const& it_vec : it_average.second)
+        for (auto const& bandwidth : bandwidths.second)
         {
-            if (it_vec > high) high = it_vec;
-            if (it_vec < low) low = it_vec;
-            average += it_vec;
+            if (bandwidth > high) high = bandwidth;
+            if (bandwidth < low) low = bandwidth;
+            average += bandwidth;
         }
         
-        average = average / it_average.second.size();
+        average = average / bandwidths.second.size();
         
-        (*statistics)[it_average.first] = std::unique_ptr<BandwidthStatistics>(new BandwidthStatistics(it_average.first, average, high, low));
+        (*statistics)[bandwidths.first] = std::make_unique<BandwidthStatistics>(average, high, low);
     }
     
     return statistics;
 }
+    
+std::unique_ptr<std::map<std::string, std::unique_ptr<BandwidthStatistics>>> BandwidthData::GetStatistics() const
+{
+    // Construct our map of time -> bandwidths.
+    // Include all data.
+    std::map<std::string, std::vector<double>> bandwidthsByTime;
+    for (auto const& it_day : m_days)
+    {
+        for (auto const& it_dp : it_day.second->DataPoints())
+        {
+            std::map<std::string, std::vector<double>>::const_iterator it_time = bandwidthsByTime.find(it_dp.first);
+            if (it_time == bandwidthsByTime.end())
+            {
+                bandwidthsByTime[it_dp.first] = std::vector<double>();
+            }
+            bandwidthsByTime[it_dp.first].push_back(it_dp.second->Bandwidth());
+        }
+    }
+    
+    // Calculate the statistics.
+    return GetStatistics(bandwidthsByTime);
+}
 
 std::unique_ptr<std::map<std::string, std::unique_ptr<BandwidthStatistics>>> BandwidthData::GetStatistics(const std::string& filter) const
 {
-    auto statistics = std::unique_ptr<std::map<std::string, std::unique_ptr<BandwidthStatistics>>>(new std::map<std::string, std::unique_ptr<BandwidthStatistics>>());
-    
-    // Build our daily averages.
-    std::map<std::string, std::vector<double>> averages;
-
+    // Construct our map of time -> bandwidths.
+    // Filter by date YYYYMMDD.
+    std::map<std::string, std::vector<double>> bandwidthsByTime;
     for (auto const& it_day : m_days)
     {
         if (filter.compare(it_day.first.substr(0, filter.length())) == 0)
         {
             for (auto const& it_dp : it_day.second->DataPoints())
             {
-                std::map<std::string, std::vector<double>>::const_iterator it_time = averages.find(it_dp.first);
-                if (it_time == averages.end())
+                std::map<std::string, std::vector<double>>::const_iterator it_time = bandwidthsByTime.find(it_dp.first);
+                if (it_time == bandwidthsByTime.end())
                 {
-                    averages[it_dp.first] = std::vector<double>();
+                    bandwidthsByTime[it_dp.first] = std::vector<double>();
                 }
-                averages[it_dp.first].push_back(it_dp.second->Bandwidth());
+                bandwidthsByTime[it_dp.first].push_back(it_dp.second->Bandwidth());
             }
         }
     }
     
-    for (auto const& it_average : averages)
-    {
-        double high = 0.0;
-        double low = 80.0;
-        double average = 0.0;
-        for (std::vector<double>::const_iterator it_vec = it_average.second.begin() ; it_vec != it_average.second.end() ; ++it_vec)
-        {
-            if (*it_vec > high) high = *it_vec;
-            if (*it_vec < low) low = *it_vec;
-            average += *it_vec;
-        }
-        average = average / it_average.second.size();
-        
-        (*statistics)[it_average.first] = std::unique_ptr<BandwidthStatistics>(new BandwidthStatistics(it_average.first, average, high, low));
-    }
-    
-    return statistics;
+    // Calculate the statistics.
+    return GetStatistics(bandwidthsByTime);
 }
 
 std::unique_ptr<std::map<std::string, std::unique_ptr<BandwidthStatistics>>> BandwidthData::GetStatistics(const std::string& start_filter, const std::string& end_filter) const
 {
-    auto statistics = std::unique_ptr<std::map<std::string, std::unique_ptr<BandwidthStatistics>>>(new std::map<std::string, std::unique_ptr<BandwidthStatistics>>());
-
-    // Build our daily averages.
-    std::map<std::string, std::vector<double>> averages;
-    
+    // Construct our map of time -> bandwidths.
+    // Filter by date from YYYYMMDD to YYYYMMDD.
+    std::map<std::string, std::vector<double>> bandwidthsByTime;
     bool include = false;
     for (auto const& it_day : m_days)
     {
@@ -336,12 +290,12 @@ std::unique_ptr<std::map<std::string, std::unique_ptr<BandwidthStatistics>>> Ban
         {
             for (auto const& it_dp : it_day.second->DataPoints())
             {
-                auto const& it_time = averages.find(it_dp.first);
-                if (it_time == averages.end())
+                auto const& it_time = bandwidthsByTime.find(it_dp.first);
+                if (it_time == bandwidthsByTime.end())
                 {
-                    averages[it_dp.first] = std::vector<double>();
+                    bandwidthsByTime[it_dp.first] = std::vector<double>();
                 }
-                averages[it_dp.first].push_back(it_dp.second->Bandwidth());
+                bandwidthsByTime[it_dp.first].push_back(it_dp.second->Bandwidth());
             }
         }
 
@@ -351,23 +305,6 @@ std::unique_ptr<std::map<std::string, std::unique_ptr<BandwidthStatistics>>> Ban
         }
     }
     
-    for (auto const& it_average : averages)
-    {
-        double high = 0.0;
-        double low = 80.0;
-        double average = 0.0;
-        
-        for (auto const& it_vec : it_average.second)
-        {
-            if (it_vec > high) high = it_vec;
-            if (it_vec < low) low = it_vec;
-            average += it_vec;
-        }
-        
-        average = average / it_average.second.size();
-        
-        (*statistics)[it_average.first] = std::unique_ptr<BandwidthStatistics>(new BandwidthStatistics(it_average.first, average, high, low));
-    }
-    
-    return statistics;
+    // Calculate the statistics.
+    return GetStatistics(bandwidthsByTime);
 }

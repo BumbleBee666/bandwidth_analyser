@@ -18,10 +18,13 @@
 #include <map>
 #include <memory>
 
+#include "JSONBase.h"
 #include "BandwidthDataPoint.h"
 
-class BandwidthDay {
+class BandwidthDay : public JSONBase
+{
 public:
+    BandwidthDay(const rapidjson::Value& obj);
     BandwidthDay(const std::string& date);
     BandwidthDay(const BandwidthDay& orig);
     virtual ~BandwidthDay();
@@ -33,12 +36,12 @@ public:
     
     const std::string& Date() const { return m_date; }
     
-    const std::string to_json() const;
-    void from_json(const std::string& json);
+    virtual bool Deserialize(const rapidjson::Value& obj);
+    virtual bool Serialize(rapidjson::Writer<rapidjson::StringBuffer>* writer) const;
     
 private:
     std::string m_date;
-    std::map<std::string, std::unique_ptr<const BandwidthDataPoint>> m_bandwidthData;
+    std::map<std::string, std::unique_ptr<BandwidthDataPoint>> m_bandwidthDataPoints;
 };
 
 #endif /* BANDWIDTHDAY_H */

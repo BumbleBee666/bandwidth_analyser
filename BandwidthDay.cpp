@@ -17,7 +17,13 @@
 #include <iostream>
 
 #include "BandwidthDay.h"
+
 #include "BandwidthFile.h"
+
+BandwidthDay::BandwidthDay(const rapidjson::Value& obj)
+{
+    Deserialize(obj);
+}
 
 BandwidthDay::BandwidthDay(const std::string& date)
 :m_date(date)
@@ -27,9 +33,9 @@ BandwidthDay::BandwidthDay(const std::string& date)
 BandwidthDay::BandwidthDay(const BandwidthDay& orig)
 {   
     this->m_date = orig.m_date;
-    for (auto const& it : orig.m_bandwidthData)
+    for (auto const& it : orig.m_bandwidthDataPoints)
     {
-        m_bandwidthData[it.first] = std::make_unique<BandwidthDataPoint>(*it.second);
+        m_bandwidthDataPoints[it.first] = std::make_unique<BandwidthDataPoint>(*it.second);
     }
 }
 
@@ -42,42 +48,41 @@ void BandwidthDay::LoadDataPoint(const std::string& directory, const std::string
     if (datapoint != NULL)
     {
         std::string filetime = datapoint->Time().substr(0,2) + datapoint->Time().substr(3,2);
-        m_bandwidthData[filetime] = std::move(datapoint);
+        m_bandwidthDataPoints[filetime] = std::move(datapoint);
     }
 }
 
 const std::map<std::string, const std::unique_ptr<const BandwidthDataPoint>>& BandwidthDay::DataPoints() const
 { 
-    return (const std::map<std::string, const std::unique_ptr<const BandwidthDataPoint>>&)m_bandwidthData; 
+    return (const std::map<std::string, const std::unique_ptr<const BandwidthDataPoint>>&)m_bandwidthDataPoints; 
 }
    
-
-const std::string BandwidthDay::to_json() const
+bool BandwidthDay::Serialize(rapidjson::Writer<rapidjson::StringBuffer>* writer) const
 {
-    const std::string newline = "\n\r";
-    const std::string continuation = ",";
+    writer->StartObject();
+    writer->Key("Date");
+    writer->String(m_date.c_str());
+    writer->Key("DataPoints");
+    writer->StartArray();
+    for (auto const& datapoint : m_bandwidthDataPoints)
+        datapoint.second->Serialize(writer);
+    writer->EndArray();
+    writer->EndObject();
     
-    std::string json;
-
-    json += "[" + newline;
-
-    int i = 0;
-    for (auto const& data : m_bandwidthData)
-    {
-        json += "{" + newline;
-        json += "\"Time\" : \"" + data.first + "\"" + continuation + newline;
-        json += "\"Bandwidth\" : " + std::to_string(data.second->Bandwidth()) + newline;
-        json += "}" + (++i == m_bandwidthData.size() ? "" : continuation) + newline;
-    }
-    
-    json += "]";
-    
-    return json;
+    return true;
 }
 
-void BandwidthDay::from_json(const std::string& json)
+bool BandwidthDay::Deserialize(const rapidjson::Value& obj)
 {
-    std::cout << "Blah";
+    m_date = obj["Date"].GetString();
+    rapidjson::Value::ConstArray datapoints = obj["DataPoints"].GetArray();
+    for (rapidjson::Value::ConstValueIterator it = datapoints.Begin(); it != datapoints.End(); ++it)
+    {
+        auto bandwidthDataPoint = std::unique_ptr<BandwidthDataPoint>(new BandwidthDataPoint(it->GetObject()));
+        m_bandwidthDataPoints[bandwidthDataPoint->Time()] = std::move(bandwidthDataPoint);
+    }
+
+    return true;
 }
 
 void BandwidthDay::LoadData(const std::string& directory)
@@ -101,7 +106,7 @@ void BandwidthDay::LoadData(const std::string& directory)
                     if (datapoint != NULL)
                     {
                         std::string filetime = datapoint->Time().substr(0,2) + datapoint->Time().substr(3,2);
-                        m_bandwidthData[filetime] = std::move(datapoint);
+                        m_bandwidthDataPoints[filetime] = std::move(datapoint);
                     }
                 }
             }            

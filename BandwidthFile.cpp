@@ -72,10 +72,9 @@ std::unique_ptr<BandwidthDataPoint> BandwidthFile::LoadFile (const std::string& 
             double bandwidth = std::stod((*fields)[5]) / 125000.0;
             
             int pos = filename.find("results_", 0);
-            std::string filedate = filename.substr(pos+8, 8);
             std::string filetime = filename.substr(pos+17, 5);
             
-            datapoint = std::unique_ptr<BandwidthDataPoint>(new BandwidthDataPoint(filedate, filetime, bandwidth));
+            datapoint = std::unique_ptr<BandwidthDataPoint>(new BandwidthDataPoint(filetime, bandwidth));
         }
         inFile.close();
     }

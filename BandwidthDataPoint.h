@@ -16,20 +16,25 @@
 
 #include <string>
 
-class BandwidthDataPoint {
+#include "JSONBase.h"
+
+class BandwidthDataPoint : public JSONBase
+{
 public:
-    BandwidthDataPoint(const std::string& date, const std::string& time, double bandwidth);
+    BandwidthDataPoint(const rapidjson::Value& obj);
+    BandwidthDataPoint(const std::string& time, double bandwidth);
     BandwidthDataPoint(const BandwidthDataPoint& orig);
     virtual ~BandwidthDataPoint();
     
-    const std::string& Date() const { return m_date; }
     const std::string& Time() const { return m_time; }
     double Bandwidth() const { return m_bandwidth; }
+
+    virtual bool Deserialize(const rapidjson::Value& obj);
+    virtual bool Serialize(rapidjson::Writer<rapidjson::StringBuffer>* writer) const;
     
 private:
-    const std::string m_date;
-    const std::string m_time;
-    const double m_bandwidth;
+    std::string m_time;
+    double m_bandwidth;
 };
 
 #endif /* BANDWITHDATAPOINT_H */

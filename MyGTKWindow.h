@@ -18,7 +18,6 @@
 #include <map>
 #include <set>
 #include <memory>
-
 #include <gtk/gtk.h>
 
 #include "MyGTKCalendarWindow.h"
@@ -34,12 +33,19 @@ public:
     virtual ~MyGTKWindow();
     
     void DrawWindow();
+    
+    // This is our callback from BandwidthData to tell us that the data has been updated.
     virtual void BandwidthUpdated();
     
 private:    
-    static void DrawSurface (MyGTKWindow *myWindow);
+    // This event is triggered when the size, position, or stacking of the window changes.
     static gboolean Configure (GtkWidget *widget, GdkEventConfigure *event, gpointer data);
+    
+    // This event is called when we need to redraw our window.
     static gboolean Draw (GtkWidget *widget, cairo_t *cr, gpointer data);
+    
+    
+    static void DrawSurface (MyGTKWindow *myWindow);
     static void SelectDay (GtkMenuItem *menuitem, gpointer data);
     static void DayDoubleClicked (GtkCalendar *calendar, gpointer data);
     static void Toggled (GtkCheckMenuItem *menuitem, gpointer data);
@@ -47,37 +53,43 @@ private:
     static void ValueChanged (GtkRange *range, gpointer data);
     static void DrawStatisticalView(cairo_t *cr, const std::map<std::string, std::unique_ptr<BandwidthStatistics>>& statistics, int bandwidth_shift, int bandwidth_scale, int time_shift, int time_scale, int sample_rate_in_minutes);
     
-private:
-    GtkApplication *m_app;
-    GtkWidget *window;
-    GtkWidget *label;
-    GtkWidget *frame;
-    GtkWidget *drawing_area;
-    GtkWidget *opt, *menu, *item;
-    GtkWidget *box1;
-    GtkWidget *dialog;
-    GtkWidget *slider;
-    GtkWidget *byMonth_item;
-    GtkWidget *itemSelectData;
-    GtkWidget *subMenu;
-    GtkWidget *byDay_item;
-    GtkWidget *separator1;
-    GtkWidget *exit_item;
-    GtkWidget *byMonth_subMenu;
-    std::vector<GtkWidget*> m_menuItems;
-
-    cairo_surface_t *surface;
-            
-    static const int width;
-    static const int height;
+    void CreateSelectDataByMonthMenu();
     
-    std::unique_ptr<std::set<std::string>> m_months;
-    std::unique_ptr<MyGTKCalendarWindow> calendar;
+    GtkApplication *m_app;
+    GtkWidget *m_window;
+    GtkWidget *m_box;
+    GtkWidget *m_frame;
+    GtkWidget *m_drawingArea;
+    
+    GtkWidget *m_menubar;
+    
+    GtkWidget *m_fileItem;
+    GtkWidget *m_fileMenu;
+    GtkWidget *m_exitItem;
+    
+    GtkWidget *m_selectDataItem;
+    GtkWidget *m_selectDataMenu;
+    GtkWidget *m_selectDataByMonthItem;
+    GtkWidget *m_selectDataByMonthMenu;
+    GtkWidget *m_selectDataByDayItem;
+    
+    GtkWidget *m_dialog;
+    GtkWidget *m_slider;
+    
+    std::set<std::string> m_months;
+    std::vector<GtkWidget*> m_selectDataByMonthMenuMonthItems;
+
+    cairo_surface_t *m_surface;
+            
+    int m_width;
+    int m_height;
+    
+    std::unique_ptr<MyGTKCalendarWindow> m_calendar;
     
     std::shared_ptr<const BandwidthData> m_bandwidthData;
     
-    std::string selected_day;
-    std::string start_day, end_day;
+    std::string m_selectedDay;
+    std::string m_startDay, m_endDay;
 };
 
 #endif /* MYGTKWINDOW_H */

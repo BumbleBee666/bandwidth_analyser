@@ -13,8 +13,8 @@
 
 #include "BandwidthStatistics.h"
 
-BandwidthStatistics::BandwidthStatistics(const std::string& time, double average, double high, double low):
-m_time(time), m_average(average), m_high(high), m_low(low)
+BandwidthStatistics::BandwidthStatistics(double average, double high, double low):
+m_average(average), m_high(high), m_low(low)
 {
 }
 

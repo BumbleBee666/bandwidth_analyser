@@ -5,7 +5,11 @@ project('bandwidth_analyser', 'cpp',
 gtkdep = dependency('gtk+-3.0')
 thread_dep = dependency('threads')
 
-incdir = include_directories('.','/usr/include/c++/10/','/usr/include/aarch64-linux-gnu/c++/10/')
+incdir = include_directories(
+'.',
+'/usr/include/c++/10/',
+'/usr/include/aarch64-linux-gnu/c++/10/',
+'./subprojects/rapidjson/include/')
 
 sources = [
 'bandwidth_analyser.cpp',
@@ -15,7 +19,8 @@ sources = [
 'BandwidthDay.cpp',
 'BandwidthDataPoint.cpp',
 'BandwidthStatistics.cpp',
-'BandwidthData.cpp'
+'BandwidthData.cpp',
+'JSONBase.cpp'
 ]
 
 exe = executable(

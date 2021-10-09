@@ -18,20 +18,18 @@
 
 class BandwidthStatistics {
 public:
-    BandwidthStatistics(const std::string& time, double average, double high, double low);
+    BandwidthStatistics(double average, double high, double low);
     BandwidthStatistics(const BandwidthStatistics& orig);
     virtual ~BandwidthStatistics();
     
     double Average() const { return m_average; }
     double High() const { return m_high; }
     double Low() const { return m_low; }
-    const std::string& Time() const { return m_time; }
 
 private:
     double m_average;
     double m_high;
     double m_low;
-    std::string m_time;
 };
 
 #endif /* BANDWIDTHSTATISTICS_H */
