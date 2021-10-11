@@ -30,9 +30,6 @@ m_time(orig.Time()), m_bandwidth(orig.Bandwidth())
 {
 }
 
-BandwidthDataPoint::~BandwidthDataPoint() {
-}
-
 bool BandwidthDataPoint::Serialize(rapidjson::Writer<rapidjson::StringBuffer>* writer) const 
 {
     writer->StartObject();

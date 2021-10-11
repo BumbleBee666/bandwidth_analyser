@@ -39,9 +39,6 @@ BandwidthDay::BandwidthDay(const BandwidthDay& orig)
     }
 }
 
-BandwidthDay::~BandwidthDay() {
-}
-
 void BandwidthDay::LoadDataPoint(const std::string& directory, const std::string& filename)
 {
     auto datapoint = BandwidthFile::LoadFile(directory + "//" + filename);
