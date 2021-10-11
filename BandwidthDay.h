@@ -27,7 +27,7 @@ public:
     BandwidthDay(const rapidjson::Value& obj);
     BandwidthDay(const std::string& date);
     BandwidthDay(const BandwidthDay& orig);
-    virtual ~BandwidthDay();
+    virtual ~BandwidthDay() {};
     
     void LoadData(const std::string& directory);
     void LoadDataPoint(const std::string& directory, const std::string& filename);

@@ -24,7 +24,7 @@ public:
     BandwidthDataPoint(const rapidjson::Value& obj);
     BandwidthDataPoint(const std::string& time, double bandwidth);
     BandwidthDataPoint(const BandwidthDataPoint& orig);
-    virtual ~BandwidthDataPoint();
+    virtual ~BandwidthDataPoint() {};
     
     const std::string& Time() const { return m_time; }
     double Bandwidth() const { return m_bandwidth; }
