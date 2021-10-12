@@ -76,7 +76,8 @@ bool BandwidthDay::Deserialize(const rapidjson::Value& obj)
     for (rapidjson::Value::ConstValueIterator it = datapoints.Begin(); it != datapoints.End(); ++it)
     {
         auto bandwidthDataPoint = std::unique_ptr<BandwidthDataPoint>(new BandwidthDataPoint(it->GetObject()));
-        m_bandwidthDataPoints[bandwidthDataPoint->Time()] = std::move(bandwidthDataPoint);
+        std::string time = bandwidthDataPoint->Time().substr(0,2) + bandwidthDataPoint->Time().substr(3,2);
+        m_bandwidthDataPoints[time] = std::move(bandwidthDataPoint);
     }
 
     return true;
@@ -99,11 +100,11 @@ void BandwidthDay::LoadData(const std::string& directory)
                 const std::string filedate = filename.substr(pos+8, 8);
                 if (filedate.compare(m_date) == 0)
                 {
-                    auto datapoint = BandwidthFile::LoadFile(directory + "//" + filename);
-                    if (datapoint != NULL)
+                    auto bandwidthDataPoint = BandwidthFile::LoadFile(directory + "//" + filename);
+                    if (bandwidthDataPoint != NULL)
                     {
-                        std::string filetime = datapoint->Time().substr(0,2) + datapoint->Time().substr(3,2);
-                        m_bandwidthDataPoints[filetime] = std::move(datapoint);
+                        std::string time = bandwidthDataPoint->Time().substr(0,2) + bandwidthDataPoint->Time().substr(3,2);
+                        m_bandwidthDataPoints[time] = std::move(bandwidthDataPoint);
                     }
                 }
             }            

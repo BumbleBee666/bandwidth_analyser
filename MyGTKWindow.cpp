@@ -97,8 +97,8 @@ MyGTKWindow::MyGTKWindow(GtkApplication *app, std::shared_ptr<const BandwidthDat
     g_signal_connect (m_drawingArea, "draw", G_CALLBACK (Draw), this);
 
     // Create a slider, and add it to the frame.
-    double max = m_bandwidthData->GetNoOfDays() == 0 ? 1.0 : m_bandwidthData->GetNoOfDays() - 1;
-    m_slider = gtk_hscale_new_with_range (0.0, max, 1.0);
+    double max = m_bandwidthData->GetNoOfDays() <= 1 ? 1.0 : m_bandwidthData->GetNoOfDays() - 1;
+    m_slider = gtk_scale_new_with_range (GTK_ORIENTATION_HORIZONTAL, 0.0, max, 1.0);
     gtk_container_add (GTK_CONTAINER (m_box), m_slider);
     g_signal_connect (m_slider, "format-value", G_CALLBACK (FormatValue), this);
     g_signal_connect (m_slider, "value-changed", G_CALLBACK (ValueChanged), this);
@@ -277,32 +277,27 @@ void MyGTKWindow::DrawSurface (MyGTKWindow *myWindow)
     if (!myWindow->m_selectedDay.empty())
     {
         // We need to show the chart for a specific day.
-        try
+        auto const& day = myWindow->m_bandwidthData->GetDay(myWindow->m_selectedDay);
+        cairo_set_source_rgb (cr, 0, 0, 0);
+        int x = 0;
+        for (auto const& datapoint : day.DataPoints())
         {
-            auto const& day = myWindow->m_bandwidthData->GetDay(myWindow->m_selectedDay);
-            cairo_set_source_rgb (cr, 0, 0, 0);
-            int x = 0;
-            for (auto const& datapoint : day.DataPoints())
+            int bandwidth = bandwidth_shift - datapoint.second->Bandwidth() * bandwidth_scale;
+            if (x == 0)
             {
-                int bandwidth = bandwidth_shift - datapoint.second->Bandwidth() * bandwidth_scale;
-                if (x == 0)
-                {
-                    x = time_shift;
-                    cairo_move_to (cr, x, bandwidth);
-                }
-                else
-                {
-                    int hour = atoi(datapoint.first.substr(0,2).c_str());
-                    int minute = atoi(datapoint.first.substr(2,2).c_str());
-                    int elapsed_minutes = hour * 60 + minute;
-                    x = time_shift + elapsed_minutes / sample_rate_in_minutes * time_scale;
-                    cairo_line_to (cr, x, bandwidth);
-                }
+                x = time_shift;
+                cairo_move_to (cr, x, bandwidth);
             }
-            cairo_stroke (cr);
+            else
+            {
+                int hour = atoi(datapoint.first.substr(0,2).c_str());
+                int minute = atoi(datapoint.first.substr(2,2).c_str());
+                int elapsed_minutes = hour * 60 + minute;
+                x = time_shift + elapsed_minutes / sample_rate_in_minutes * time_scale;
+                cairo_line_to (cr, x, bandwidth);
+            }
         }
-        catch (std::invalid_argument)
-        {}
+        cairo_stroke (cr);
     }
     else if (!myWindow->m_startDay.empty())
     {

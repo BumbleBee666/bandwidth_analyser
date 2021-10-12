@@ -149,7 +149,7 @@ bool BandwidthData::Deserialize(const rapidjson::Value& obj)
 void BandwidthData::UpdateThread()
 {
     // Load the cache into memory.
-//    JSONBase::DeserializeFromFile(cacheFile);
+    JSONBase::DeserializeFromFile(cacheFile);
     
     // Keep going until told to exit.
     while (!m_finishThread)
@@ -179,7 +179,7 @@ void BandwidthData::UpdateThread()
             }
             
             // Write the new data set to our cache file.
-//            JSONBase::SerializeToFile(cacheFile);
+            JSONBase::SerializeToFile(cacheFile);
         }
     
 //        std::cout << JSONBase::Serialize() << std::endl;
